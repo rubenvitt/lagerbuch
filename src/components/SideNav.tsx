@@ -17,7 +17,9 @@ export function SideNav() {
   return (
     <nav className="snav">
       {NAV.map(({ href, label, icon: Icon }) => {
-        const active = href === "/verwaltung" ? pathname === href : pathname.startsWith(href);
+        // "/verwaltung" itself must never match as a prefix of its children (every
+        // other route starts with "/verwaltung/"), so it only matches exactly.
+        const active = pathname === href || (href !== "/verwaltung" && pathname.startsWith(href + "/"));
         return (
           <Link key={href} href={href} className={`sitem${active ? " on" : ""}`}>
             <Icon size={17} />
