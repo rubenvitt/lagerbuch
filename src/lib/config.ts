@@ -11,9 +11,21 @@ export interface AppConfig {
   warnTageFaellig: number;
   bestellFaktor: number;
   helferSessionStunden: number;
+  authSecret: string;
+  oidcIssuer: string;
+  oidcClientId: string;
+  oidcClientSecret: string;
+  oidcAdminGroup: string;
+  authDevLogin: boolean;
+  nodeEnv: string;
 }
 
-const EnvSchema = z.object({
+const boolEnv = z
+  .enum(["true", "false"])
+  .default("false")
+  .transform((v) => v === "true");
+
+const BaseEnvSchema = z.object({
   APP_NAME: z.string().default("Lagerbuch"),
   APP_ORG: z.string().default(""),
   APP_TAGLINE: z.string().default("Materialverwaltung"),
@@ -24,7 +36,19 @@ const EnvSchema = z.object({
   WARN_TAGE_FAELLIG: z.coerce.number().int().positive().default(56),
   BESTELL_FAKTOR: z.coerce.number().positive().default(2),
   HELFER_SESSION_STUNDEN: z.coerce.number().int().positive().default(12),
+  NODE_ENV: z.string().default("development"),
+  AUTH_SECRET: z.string().default("dev-insecure-secret-change-me"),
+  OIDC_ISSUER: z.string().default(""),
+  OIDC_CLIENT_ID: z.string().default(""),
+  OIDC_CLIENT_SECRET: z.string().default(""),
+  OIDC_ADMIN_GROUP: z.string().default("lagerbuch-admin"),
+  AUTH_DEV_LOGIN: boolEnv,
 });
+
+const EnvSchema = BaseEnvSchema.refine(
+  (e) => !(e.AUTH_DEV_LOGIN && e.NODE_ENV === "production"),
+  { message: "AUTH_DEV_LOGIN darf in production nicht aktiv sein" },
+);
 
 export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
   const parsed = EnvSchema.safeParse(env);
@@ -44,6 +68,13 @@ export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
     warnTageFaellig: e.WARN_TAGE_FAELLIG,
     bestellFaktor: e.BESTELL_FAKTOR,
     helferSessionStunden: e.HELFER_SESSION_STUNDEN,
+    authSecret: e.AUTH_SECRET,
+    oidcIssuer: e.OIDC_ISSUER,
+    oidcClientId: e.OIDC_CLIENT_ID,
+    oidcClientSecret: e.OIDC_CLIENT_SECRET,
+    oidcAdminGroup: e.OIDC_ADMIN_GROUP,
+    authDevLogin: e.AUTH_DEV_LOGIN,
+    nodeEnv: e.NODE_ENV,
   };
 }
 

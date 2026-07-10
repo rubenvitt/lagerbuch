@@ -38,4 +38,27 @@ describe("parseConfig", () => {
       parseConfig({ APP_BASE_URL: "not-a-url" } as unknown as NodeJS.ProcessEnv),
     ).toThrow();
   });
+
+  it("defaults auth fields and dev-login off", () => {
+    const c = parseConfig({} as NodeJS.ProcessEnv);
+    expect(c.oidcAdminGroup).toBe("lagerbuch-admin");
+    expect(c.authDevLogin).toBe(false);
+  });
+
+  it("throws when AUTH_DEV_LOGIN=true in production", () => {
+    expect(() =>
+      parseConfig({
+        NODE_ENV: "production",
+        AUTH_DEV_LOGIN: "true",
+      } as unknown as NodeJS.ProcessEnv),
+    ).toThrow();
+  });
+
+  it("allows AUTH_DEV_LOGIN=true outside production", () => {
+    const c = parseConfig({
+      NODE_ENV: "development",
+      AUTH_DEV_LOGIN: "true",
+    } as unknown as NodeJS.ProcessEnv);
+    expect(c.authDevLogin).toBe(true);
+  });
 });
