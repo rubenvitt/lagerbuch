@@ -16,6 +16,9 @@ export default async function VerwaltungLayout({ children }: { children: React.R
           <div className="brandsub">Verwaltung</div>
         </div>
         <SideNav />
+        <div className="brandsub" style={{ padding: "0 8px 10px" }}>
+          Angemeldet als {session.user.name ?? session.user.email ?? "?"}
+        </div>
         <form
           action={async () => {
             "use server";
