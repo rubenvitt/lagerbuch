@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
-import { artikel, buchungen, chargen } from "@/db/schema";
+import { artikel, buchungen, chargen, tokens } from "@/db/schema";
 import { bestand, bestandProCharge } from "@/lib/domain/bestand";
 import { verfallStatus } from "@/lib/domain/verfall";
 import { braucht } from "@/lib/domain/vorschlag";
@@ -99,4 +99,13 @@ export function kennzahlen(db: DB) {
 
   const buchungenGesamt = allBu.length;
   return { unterMindest, chargenKritisch, offeneBestellungen, buchungenGesamt };
+}
+
+export function tokenListe(db: DB) {
+  return db
+    .select()
+    .from(tokens)
+    .orderBy(desc(tokens.createdAt))
+    .all()
+    .map((t) => ({ id: t.id, code: t.code, label: t.label, aktiv: t.aktiv, lastUsedAt: t.lastUsedAt, createdAt: t.createdAt }));
 }
