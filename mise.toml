@@ -1,3 +1,10 @@
 [tools]
 node = "24"
 pnpm = "11"
+
+# `mise run dev` — Next.js Dev-Server mit aktivem Demo-Login (Verwaltung ohne
+# Pocket ID). DATABASE_PATH kommt aus .env.development.
+[tasks.dev]
+description = "Next.js Dev-Server mit Demo-Login (Verwaltung ohne Pocket ID)"
+env = { AUTH_DEV_LOGIN = "true" }
+run = "pnpm dev"
