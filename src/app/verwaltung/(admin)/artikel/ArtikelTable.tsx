@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, Plus } from "lucide-react";
 import type { Ampel } from "@/lib/domain/verfall";
+import { chipTone } from "@/lib/format";
 import { Plakette } from "@/components/Plakette";
 import { NeuArtikel } from "./NeuArtikel";
 import { ArtikelDrawer } from "./ArtikelDrawer";
@@ -32,7 +33,7 @@ function StatusChips({ row }: { row: ArtikelRow }) {
         </span>
       )}
       {row.naechsteAblaufText && row.naechsteAmpel && (
-        <span className={`chip chip-${row.naechsteAmpel}`}>Charge {row.naechsteAblaufText}</span>
+        <span className={`chip chip-${chipTone(row.naechsteAmpel)}`}>Charge {row.naechsteAblaufText}</span>
       )}
     </>
   );

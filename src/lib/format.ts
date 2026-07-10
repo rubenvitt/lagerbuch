@@ -20,3 +20,13 @@ export function chargeText(status: { ampel: Ampel; abgelaufen: boolean }, verfal
   if (status.ampel === "gelb") return `fällig ${fmtVerfall(verfall)}`;
   return `bis ${fmtVerfall(verfall)}`;
 }
+
+/**
+ * CSS chip-tone suffix for an Ampel value. The `.chip-*` classes in globals.css are named
+ * "rot"/"gelb"/"ok" (ported from the mockup's tone naming), NOT "gruen" — so `gruen` must be
+ * mapped to "ok" here rather than interpolated directly into `chip-${ampel}` (that would emit
+ * an undefined `chip-gruen` class: padding/radius but no background/text color).
+ */
+export function chipTone(ampel: Ampel): "rot" | "gelb" | "ok" {
+  return ampel === "gruen" ? "ok" : ampel;
+}

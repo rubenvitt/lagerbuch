@@ -8,7 +8,7 @@ import { Stepper } from "@/components/Stepper";
 import { updateArtikel } from "@/actions/artikel";
 import { bucheZugang, bucheEntnahme } from "@/actions/buchung";
 import { getDetail, type ArtikelDetailResult } from "@/actions/detail";
-import { fmtTs, fmtVerfall } from "@/lib/format";
+import { chipTone, fmtTs, fmtVerfall } from "@/lib/format";
 
 const EINHEITEN = ["Stk.", "Pkg.", "Fl.", "Box"];
 const NEUE_CHARGE = "__neu__";
@@ -185,7 +185,7 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
               <AlertTriangle size={11} /> unter Mindestbestand
             </span>
           )}
-          {worstAblauf && <span className={`chip chip-${worstAblauf.ampel}`}>Charge {worstAblauf.text}</span>}
+          {worstAblauf && <span className={`chip chip-${chipTone(worstAblauf.ampel)}`}>Charge {worstAblauf.text}</span>}
         </div>
 
         {error && (
@@ -276,7 +276,7 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
               <div className="rowmain">
                 <div style={{ font: "600 12.5px var(--mono)" }}>Charge {c.chargenNr}</div>
                 <div className="rowmeta">
-                  <span className={`chip chip-${c.ampel}`}>{c.text}</span>
+                  <span className={`chip chip-${chipTone(c.ampel)}`}>{c.text}</span>
                 </div>
               </div>
               <div className="bignum" style={{ fontSize: 19 }}>
