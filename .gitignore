@@ -25,6 +25,7 @@ stack.env
 /playwright-report/
 /test-results/
 /.playwright/
+*.tsbuildinfo
 
 # Editor / OS
 .DS_Store
