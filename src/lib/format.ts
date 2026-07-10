@@ -30,3 +30,14 @@ export function chargeText(status: { ampel: Ampel; abgelaufen: boolean }, verfal
 export function chipTone(ampel: Ampel): "rot" | "gelb" | "ok" {
   return ampel === "gruen" ? "ok" : ampel;
 }
+
+const TYP_LABEL: Record<string, string> = {
+  zugang: "Wareneingang",
+  entnahme: "Entnahme",
+  korrektur: "Korrektur",
+};
+
+/** German label for a Buchung's `typ`, matching the mockup's wording. */
+export function typLabel(typ: string): string {
+  return TYP_LABEL[typ] ?? typ;
+}

@@ -2,36 +2,12 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { getDb } from "@/db";
 import { artikelListe, journalEintraege, kennzahlen } from "@/db/queries";
-import { verfallStatus, type Ampel } from "@/lib/domain/verfall";
+import { verfallStatus } from "@/lib/domain/verfall";
 import { braucht } from "@/lib/domain/vorschlag";
 import { config } from "@/lib/config";
+import { chargeText, fmtTs, typLabel } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
-
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function fmtVerfall(v: string): string {
-  const [y, m] = v.split("-");
-  return `${m}/${y.slice(2)}`;
-}
-
-function fmtTs(ts: Date): string {
-  return `${pad2(ts.getDate())}.${pad2(ts.getMonth() + 1)}. ${pad2(ts.getHours())}:${pad2(ts.getMinutes())}`;
-}
-
-function chargeText(status: { ampel: Ampel; abgelaufen: boolean }, verfall: string): string {
-  if (status.abgelaufen) return "abgelaufen";
-  if (status.ampel === "rot") return `läuft ${fmtVerfall(verfall)} ab`;
-  return `fällig ${fmtVerfall(verfall)}`;
-}
-
-const TYP_LABEL: Record<string, string> = {
-  zugang: "Wareneingang",
-  entnahme: "Entnahme",
-  korrektur: "Korrektur",
-};
 
 export default function VerwaltungHome() {
   const db = getDb();
@@ -110,12 +86,12 @@ export default function VerwaltungHome() {
         <div className="cardtitle">Letzte Buchungen</div>
         {journal.length === 0 && <div className="empty">Noch keine Buchungen.</div>}
         {journal.map((j) => {
-          const typLabel = TYP_LABEL[j.typ] ?? j.typ;
+          const label = typLabel(j.typ);
           return (
             <div className="row" key={j.id}>
               <span className="jts">{fmtTs(j.ts)}</span>
               <span style={{ flex: 1 }}>
-                {j.artikelName} · {j.kommentar ? `${typLabel} · ${j.kommentar}` : typLabel}
+                {j.artikelName} · {j.kommentar ? `${label} · ${j.kommentar}` : label}
               </span>
               <span className={`jdelta ${j.menge < 0 ? "minus" : "plus"}`}>
                 {j.menge > 0 ? "+" : ""}

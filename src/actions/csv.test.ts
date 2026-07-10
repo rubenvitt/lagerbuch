@@ -7,7 +7,8 @@ import { createTestDb } from "@/db/testing";
 import { ensureHandlager } from "@/db/seed-handlager";
 import { artikel, buchungen } from "@/db/schema";
 import { bestand } from "@/lib/domain/bestand";
-import { parseArtikelCsv, importArtikelCsv } from "./csv";
+import { parseArtikelCsv } from "@/lib/csv";
+import { importArtikelCsv } from "./csv";
 
 describe("csv", () => {
   it("parses valid rows and collects errors", () => {

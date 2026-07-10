@@ -8,17 +8,11 @@ import { Stepper } from "@/components/Stepper";
 import { updateArtikel } from "@/actions/artikel";
 import { bucheZugang, bucheEntnahme } from "@/actions/buchung";
 import { getDetail, type ArtikelDetailResult } from "@/actions/detail";
-import { chipTone, fmtTs, fmtVerfall } from "@/lib/format";
+import { chipTone, fmtTs, fmtVerfall, typLabel } from "@/lib/format";
 
 const EINHEITEN = ["Stk.", "Pkg.", "Fl.", "Box"];
 const NEUE_CHARGE = "__neu__";
 const MINDEST_DEBOUNCE_MS = 400;
-
-const TYP_LABEL: Record<string, string> = {
-  zugang: "Wareneingang",
-  entnahme: "Entnahme",
-  korrektur: "Korrektur",
-};
 
 export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   const router = useRouter();
@@ -291,7 +285,7 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
           <div className="cardtitle">Letzte Buchungen</div>
           {detail.buchungen.length === 0 && <div className="empty">Noch keine Buchungen.</div>}
           {detail.buchungen.map((b, i) => {
-            const label = TYP_LABEL[b.typ] ?? b.typ;
+            const label = typLabel(b.typ);
             return (
               <div className="row" key={`${b.ts.getTime()}_${i}`}>
                 <span className="jts">{fmtTs(b.ts)}</span>
