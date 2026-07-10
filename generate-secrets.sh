@@ -27,7 +27,10 @@ mv "$tmp" "$OUT"
 prompt_secret() {
   local key="$1" current="$2" val
   read -rp "$key [$current]: " val
-  [[ -n "$val" ]] && sed -i.bak "s|^$key=.*|$key=$val|" "$OUT" && rm -f "$OUT.bak"
+  if [[ -n "$val" ]]; then
+    sed -i.bak "s|^$key=.*|$key=$val|" "$OUT"
+    rm -f "$OUT.bak"
+  fi
 }
 
 echo "OIDC-Werte aus Pocket ID (Enter = Beispielwert behalten):"
