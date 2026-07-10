@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState } from "react";
 import { signIn } from "next-auth/react";
-import { Key, QrCode } from "lucide-react";
+import { Key } from "lucide-react";
+import { einloesenAmGate, type GateState } from "@/app/(gate)/actions";
 
 export interface GateBranding {
   appOrg: string;
@@ -10,15 +11,11 @@ export interface GateBranding {
 }
 
 export function Gate({
-  branding,
-  oidcEnabled,
-  devLoginEnabled,
+  branding, oidcEnabled, devLoginEnabled, returnTo,
 }: {
-  branding: GateBranding;
-  oidcEnabled: boolean;
-  devLoginEnabled: boolean;
+  branding: GateBranding; oidcEnabled: boolean; devLoginEnabled: boolean; returnTo: string;
 }) {
-  const [code, setCode] = useState("");
+  const [state, formAction, pending] = useActionState<GateState, FormData>(einloesenAmGate, {});
 
   return (
     <div className="gate">
@@ -33,23 +30,13 @@ export function Gate({
       <div className="gatecards">
         <div className="gatecard">
           <h2>Im Dienst</h2>
-          <p>
-            Für Helfer:innen: Code vom Regal- oder Fahrzeugetikett eingeben –
-            ohne Konto, ohne Passwort. Nur Entnahme &amp; Fahrzeug-Check.
-          </p>
-          <input
-            className="input tokeninput"
-            placeholder="000-000"
-            value={code}
-            aria-label="Zugangs-Code"
-            onChange={(e) => setCode(e.target.value)}
-          />
-          <button className="btn btn-rot" disabled>
-            Weiter
-          </button>
-          <button className="btn btn-ghost" disabled>
-            <QrCode size={16} /> Fahrzeug-Code scannen
-          </button>
+          <p>Für Helfer:innen: Code vom Regal- oder Fahrzeugetikett eingeben – ohne Konto, ohne Passwort. Nur Entnahme.</p>
+          <form action={formAction} style={{ display: "contents" }}>
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <input className="input tokeninput" name="code" placeholder="000-000" aria-label="Zugangs-Code" autoComplete="off" />
+            {state.error && <div className="gateerr">{state.error}</div>}
+            <button className="btn btn-rot" type="submit" disabled={pending}>Weiter</button>
+          </form>
         </div>
         <div className="gatecard">
           <h2>Verwaltung</h2>
