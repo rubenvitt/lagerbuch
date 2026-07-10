@@ -5,6 +5,7 @@ import { AlertTriangle, Plus } from "lucide-react";
 import type { Ampel } from "@/lib/domain/verfall";
 import { Plakette } from "@/components/Plakette";
 import { NeuArtikel } from "./NeuArtikel";
+import { ArtikelDrawer } from "./ArtikelDrawer";
 
 export type ArtikelRow = {
   id: string;
@@ -39,6 +40,7 @@ function StatusChips({ row }: { row: ArtikelRow }) {
 
 export function ArtikelTable({ rows }: { rows: ArtikelRow[] }) {
   const [neuOffen, setNeuOffen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
     <>
@@ -63,7 +65,7 @@ export function ArtikelTable({ rows }: { rows: ArtikelRow[] }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id}>
+              <tr key={row.id} className="click" onClick={() => setSelectedId(row.id)}>
                 <td style={{ fontWeight: 600 }}>{row.name}</td>
                 <td>
                   <span className="fach">{row.fach}</span>
@@ -94,6 +96,7 @@ export function ArtikelTable({ rows }: { rows: ArtikelRow[] }) {
         </table>
       </div>
       {neuOffen && <NeuArtikel onClose={() => setNeuOffen(false)} />}
+      {selectedId && <ArtikelDrawer key={selectedId} id={selectedId} onClose={() => setSelectedId(null)} />}
     </>
   );
 }
