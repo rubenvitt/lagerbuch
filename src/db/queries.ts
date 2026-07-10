@@ -5,6 +5,7 @@ import { bestand, bestandProCharge } from "@/lib/domain/bestand";
 import { verfallStatus } from "@/lib/domain/verfall";
 import { braucht } from "@/lib/domain/vorschlag";
 import { config } from "@/lib/config";
+import { chargeText } from "@/lib/format";
 
 export type ChargeZeile = { id: string; chargenNr: string; verfall: string; rest: number };
 export type ArtikelZeile = {
@@ -99,6 +100,28 @@ export function kennzahlen(db: DB) {
 
   const buchungenGesamt = allBu.length;
   return { unterMindest, chargenKritisch, offeneBestellungen, buchungenGesamt };
+}
+
+export function artikelDetailHelfer(db: DB, id: string) {
+  const d = artikelDetail(db, id);
+  if (!d) return null;
+  const now = new Date();
+  const opts = { kritisch: config.warnTageKritisch, faellig: config.warnTageFaellig };
+  const chargen = d.chargen
+    .filter((c) => c.rest > 0)
+    .map((c) => {
+      const s = verfallStatus(c.verfall, opts, now);
+      return { ...c, ampel: s.ampel, text: chargeText(s, c.verfall) };
+    })
+    .sort((a, b) => a.verfall.localeCompare(b.verfall));
+  return {
+    id: d.artikel.id,
+    name: d.artikel.name,
+    einheit: d.artikel.einheit,
+    fach: d.artikel.fach,
+    bestand: d.bestand,
+    chargen,
+  };
 }
 
 export function tokenListe(db: DB) {

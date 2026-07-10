@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createTestDb } from "@/db/testing";
 import { artikel, chargen, buchungen, lagerorte, newId } from "@/db/schema";
-import { artikelListe, artikelDetail, journalEintraege, kennzahlen } from "./queries";
+import { artikelListe, artikelDetail, artikelDetailHelfer, journalEintraege, kennzahlen } from "./queries";
 
 function seed() {
   const db = createTestDb();
@@ -76,6 +76,29 @@ describe("queries", () => {
     const kB = kennzahlen(dbB);
     expect(kB.unterMindest).toBe(1);
     expect(kB.offeneBestellungen).toBe(0);
+  });
+
+  it("artikelDetailHelfer omits depleted chargen and sorts remaining ones by verfall", () => {
+    const { db, a, cEarly } = seed();
+    const cDep = newId();
+    db.insert(chargen).values({ id: cDep, artikelId: a, chargenNr: "DEP", verfall: "2021-01", createdAt: new Date() }).run();
+    const lo = db.select().from(lagerorte).all()[0].id;
+    db.insert(buchungen).values({ id: newId(), ts: new Date(), typ: "zugang", artikelId: a, chargeId: cDep, lagerortId: lo, menge: 2, quelleTyp: "oidc", quelleId: "u1" }).run();
+    db.insert(buchungen).values({ id: newId(), ts: new Date(), typ: "entnahme", artikelId: a, chargeId: cDep, lagerortId: lo, menge: -2, quelleTyp: "oidc", quelleId: "u1" }).run();
+
+    const d = artikelDetailHelfer(db, a)!;
+    expect(d.id).toBe(a);
+    expect(d.bestand).toBe(10);
+    expect(d.chargen.every((c) => c.rest > 0)).toBe(true);
+    expect(d.chargen.map((c) => c.id)).not.toContain(cDep);
+    expect(d.chargen[0].id).toBe(cEarly); // 2026-08 sorts before 2028-01
+    expect(d.chargen[0]).toHaveProperty("ampel");
+    expect(d.chargen[0]).toHaveProperty("text");
+  });
+
+  it("artikelDetailHelfer returns null for unknown id", () => {
+    const { db } = seed();
+    expect(artikelDetailHelfer(db, "nope")).toBeNull();
   });
 
   it("journalEintraege orders by ts descending", () => {
