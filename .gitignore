@@ -16,6 +16,7 @@ stack.env
 
 # Runtime data volume & SQLite
 /data/
+/.data/
 *.db
 *.db-shm
 *.db-wal
