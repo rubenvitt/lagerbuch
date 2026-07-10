@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { Key, QrCode } from "lucide-react";
 
 export interface GateBranding {
@@ -8,7 +9,15 @@ export interface GateBranding {
   appTagline: string;
 }
 
-export function Gate({ branding }: { branding: GateBranding }) {
+export function Gate({
+  branding,
+  oidcEnabled,
+  devLoginEnabled,
+}: {
+  branding: GateBranding;
+  oidcEnabled: boolean;
+  devLoginEnabled: boolean;
+}) {
   const [code, setCode] = useState("");
 
   return (
@@ -49,9 +58,21 @@ export function Gate({ branding }: { branding: GateBranding }) {
             Fahrzeuge, Bestellvorschläge, Journal und Zugangs-Codes.
           </p>
           <div style={{ flex: 1 }} />
-          <button className="btn btn-tinte" disabled>
+          <button
+            className="btn btn-tinte"
+            disabled={!oidcEnabled}
+            onClick={() => signIn("oidc", { callbackUrl: "/verwaltung" })}
+          >
             <Key size={16} /> Mit Pocket ID anmelden
           </button>
+          {devLoginEnabled && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => signIn("dev-login", { callbackUrl: "/verwaltung" })}
+            >
+              Demo-Login (nur Entwicklung)
+            </button>
+          )}
         </div>
       </div>
     </div>

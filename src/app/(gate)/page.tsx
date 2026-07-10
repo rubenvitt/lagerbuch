@@ -10,6 +10,8 @@ export default function GatePage() {
         appOrg: config.appOrg,
         appTagline: config.appTagline,
       }}
+      oidcEnabled={Boolean(config.oidcIssuer)}
+      devLoginEnabled={config.authDevLogin && config.nodeEnv !== "production"}
     />
   );
 }

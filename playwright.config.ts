@@ -12,7 +12,12 @@ export default defineConfig({
     : {
         command: "pnpm dev",
         url: "http://localhost:3000/api/health",
-        env: { APP_ORG: "DRK Bereitschaft Musterstadt" },
+        env: {
+          APP_ORG: "DRK Bereitschaft Musterstadt",
+          AUTH_DEV_LOGIN: "true",
+          AUTH_SECRET: "test-secret",
+          NODE_ENV: "development",
+        },
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
       },
