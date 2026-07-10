@@ -16,6 +16,10 @@ export function Gate({
   branding: GateBranding; oidcEnabled: boolean; devLoginEnabled: boolean; returnTo: string;
 }) {
   const [state, formAction, pending] = useActionState<GateState, FormData>(einloesenAmGate, {});
+  // returnTo ist bereits serverseitig (page.tsx) sanitiert; ein gescanntes
+  // Regaletikett /a/{id} führt ausgeloggte Admins nach dem Login zurück auf
+  // den Artikel (a/[artikelId]/page.tsx leitet Admins dann in die Verwaltung).
+  const adminCallback = returnTo || "/verwaltung";
 
   return (
     <div className="gate">
@@ -48,14 +52,14 @@ export function Gate({
           <button
             className="btn btn-tinte"
             disabled={!oidcEnabled}
-            onClick={() => signIn("oidc", { callbackUrl: "/verwaltung" })}
+            onClick={() => signIn("oidc", { callbackUrl: adminCallback })}
           >
             <Key size={16} /> Mit Pocket ID anmelden
           </button>
           {devLoginEnabled && (
             <button
               className="btn btn-ghost"
-              onClick={() => signIn("dev-login", { callbackUrl: "/verwaltung" })}
+              onClick={() => signIn("dev-login", { callbackUrl: adminCallback })}
             >
               Demo-Login (nur Entwicklung)
             </button>

@@ -26,9 +26,15 @@ describe("consumeRate", () => {
 });
 
 describe("clientIp", () => {
-  it("nimmt den ersten XFF-Hop", () => {
+  it("nimmt den letzten (vom Proxy angehängten) XFF-Hop", () => {
     const h = new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" });
-    expect(clientIp(h, "fb")).toBe("203.0.113.7");
+    expect(clientIp(h, "fb")).toBe("10.0.0.1");
+  });
+  it("ignoriert vom Client gespooofte linke Einträge", () => {
+    // Angreifer setzt selbst 'X-Forwarded-For: 1.2.3.4, 203.0.113.7';
+    // der Proxy hängt die echte Peer-IP als letzten Eintrag an.
+    const h = new Headers({ "x-forwarded-for": "1.2.3.4, 203.0.113.7, 10.0.0.1" });
+    expect(clientIp(h, "fb")).toBe("10.0.0.1");
   });
   it("fällt ohne XFF auf fallback zurück", () => {
     expect(clientIp(new Headers(), "fb")).toBe("fb");

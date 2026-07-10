@@ -7,6 +7,7 @@ const cookieStore = new Map<string, string>();
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: (n: string) => (cookieStore.has(n) ? { value: cookieStore.get(n)! } : undefined) }),
 }));
+import { eq } from "drizzle-orm";
 import { createTestDb } from "@/db/testing";
 import { tokens, newId } from "@/db/schema";
 import { createHelferSession } from "@/lib/auth/helferSession";
@@ -27,6 +28,11 @@ describe("requireHelfer", () => {
   });
   it("wirft bei gesperrtem Token (sofortige Sperrwirkung)", async () => {
     const { db } = await setup(false);
+    await expect(requireHelfer(db)).rejects.toThrow();
+  });
+  it("wirft bei gelöschtem Token (Cookie gültig, Token-Zeile entfernt)", async () => {
+    const { db, id } = await setup(true);
+    db.delete(tokens).where(eq(tokens.id, id)).run();
     await expect(requireHelfer(db)).rejects.toThrow();
   });
   it("wirft ohne Cookie", async () => {

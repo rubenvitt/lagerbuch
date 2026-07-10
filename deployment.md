@@ -51,8 +51,10 @@ Leite `https://<deine-domain>` → `http://<host>:<HOST_PORT>` weiter.
 `APP_BASE_URL` muss exakt der öffentlichen URL entsprechen.
 
 - Der Reverse-Proxy **muss `X-Forwarded-For`** an den Container weiterreichen
-  – sonst greift das Rate-Limit für Token-Gate/`/t` global statt pro
-  Client-IP.
+  und dabei die **echte Client-IP als letzten Eintrag anhängen** (nginx
+  `$proxy_add_x_forwarded_for`, Caddy-Default) – die App vertraut genau diesem
+  rechtesten Eintrag. Fehlt der Header, greift das Rate-Limit für
+  Token-Gate/`/t` global statt pro Client-IP.
 - **`HELFER_SESSION_SECRET`** ist in Produktion Pflicht (Start wirft sonst);
   via `generate-secrets.sh` erzeugen (siehe Konfiguration oben).
 - Das Rate-Limit (5 Versuche/Minute/IP) ist prozesslokal (In-Memory) und

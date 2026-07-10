@@ -20,11 +20,17 @@ export function consumeRate(key: string, now: number = Date.now()): { ok: boolea
   return { ok: false, retryAfter };
 }
 
+// Nimmt den RECHTESTEN X-Forwarded-For-Eintrag, nicht den linkesten:
+// Annahme laut deployment.md ist genau EIN vertrauenswürdiger Reverse-Proxy,
+// der die echte Peer-IP als letzten Eintrag anhängt (nginx
+// `$proxy_add_x_forwarded_for`, Caddy-Default). Der linkeste Eintrag ist vom
+// Client frei setzbar; ihn zu vertrauen würde das Per-IP-Rate-Limit durch
+// XFF-Spoofing aushebeln (CWE-348).
 export function clientIp(headers: Headers, fallback: string): string {
   const xff = headers.get("x-forwarded-for");
   if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
+    const last = xff.split(",").at(-1)?.trim();
+    if (last) return last;
   }
   return fallback;
 }
