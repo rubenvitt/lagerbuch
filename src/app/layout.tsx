@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed, IBM_Plex_Mono } from "next/font/google";
+import { config } from "@/lib/config";
 import "./globals.css";
 
 const barlow = Barlow({
@@ -21,10 +22,12 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Lagerbuch",
-  manifest: "/manifest.webmanifest",
-};
+export function generateMetadata(): Metadata {
+  return {
+    title: config.appName,
+    manifest: "/manifest.webmanifest",
+  };
+}
 
 export default function RootLayout({
   children,

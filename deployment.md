@@ -13,6 +13,11 @@ Public: `ghcr.io/rubenvitt/lagerbuch`.
 Tags: `edge` (jeder `main`-Push), `sha-<sha>`, `vX.Y.Z` + `latest` (Releases).
 Multi-Arch: `linux/amd64`, `linux/arm64`.
 
+**Einmalig nach dem ersten CI-Publish:** Das GHCR-Package ist anfangs privat.
+Sichtbarkeit einmalig auf **Public** stellen (GitHub → Packages → lagerbuch →
+Package settings → Change visibility), sonst schlägt `docker compose pull`
+mit `denied`/`not found` fehl.
+
 ## Konfiguration
 1. `./generate-secrets.sh` → erzeugt `stack.env` (AUTH_SECRET,
    HELFER_SESSION_SECRET zufällig; OIDC interaktiv). Datei ist gitignored.

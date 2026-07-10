@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Key, QrCode } from "lucide-react";
 
 export interface GateBranding {
-  appName: string;
   appOrg: string;
   appTagline: string;
 }
