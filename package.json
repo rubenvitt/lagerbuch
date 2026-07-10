@@ -16,6 +16,7 @@
   "dependencies": {
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
+    "jose": "^6.2.3",
     "lucide-react": "^0.474.0",
     "nanoid": "^5.1.16",
     "next": "^15.1.6",

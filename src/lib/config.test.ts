@@ -61,6 +61,11 @@ describe("parseConfig", () => {
     } as unknown as NodeJS.ProcessEnv);
     expect(c.authDevLogin).toBe(true);
   });
+
+  it("liest HELFER_SESSION_SECRET (Default = Dev-Secret)", () => {
+    const c = parseConfig({} as NodeJS.ProcessEnv);
+    expect(c.helferSessionSecret).toBe("dev-insecure-secret-change-me");
+  });
 });
 
 describe("assertProductionSecrets", () => {
@@ -83,6 +88,7 @@ describe("assertProductionSecrets", () => {
       ...parseConfig({} as NodeJS.ProcessEnv),
       nodeEnv: "production",
       authSecret: "a-real-secret",
+      helferSessionSecret: "a-real-helfer-secret",
     };
     expect(() => assertProductionSecrets(c)).not.toThrow();
   });
@@ -90,5 +96,13 @@ describe("assertProductionSecrets", () => {
   it("does not throw outside production with the dev-default AUTH_SECRET", () => {
     const c = { ...parseConfig({} as NodeJS.ProcessEnv), nodeEnv: "development" };
     expect(() => assertProductionSecrets(c)).not.toThrow();
+  });
+
+  it("assertProductionSecrets wirft ohne HELFER_SESSION_SECRET in prod", () => {
+    const c = parseConfig({
+      NODE_ENV: "production",
+      AUTH_SECRET: "x".repeat(40),
+    } as NodeJS.ProcessEnv);
+    expect(() => assertProductionSecrets(c)).toThrow(/HELFER_SESSION_SECRET/);
   });
 });

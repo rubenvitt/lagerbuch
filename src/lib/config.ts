@@ -12,6 +12,7 @@ export interface AppConfig {
   bestellFaktor: number;
   helferSessionStunden: number;
   authSecret: string;
+  helferSessionSecret: string;
   oidcIssuer: string;
   oidcClientId: string;
   oidcClientSecret: string;
@@ -38,6 +39,7 @@ const BaseEnvSchema = z.object({
   HELFER_SESSION_STUNDEN: z.coerce.number().int().positive().default(12),
   NODE_ENV: z.string().default("development"),
   AUTH_SECRET: z.string().default("dev-insecure-secret-change-me"),
+  HELFER_SESSION_SECRET: z.string().default("dev-insecure-secret-change-me"),
   OIDC_ISSUER: z.string().default(""),
   OIDC_CLIENT_ID: z.string().default(""),
   OIDC_CLIENT_SECRET: z.string().default(""),
@@ -74,6 +76,7 @@ export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
     bestellFaktor: e.BESTELL_FAKTOR,
     helferSessionStunden: e.HELFER_SESSION_STUNDEN,
     authSecret: e.AUTH_SECRET,
+    helferSessionSecret: e.HELFER_SESSION_SECRET,
     oidcIssuer: e.OIDC_ISSUER,
     oidcClientId: e.OIDC_CLIENT_ID,
     oidcClientSecret: e.OIDC_CLIENT_SECRET,
@@ -97,9 +100,15 @@ export const config = parseConfig(process.env);
  */
 export function assertProductionSecrets(cfg: AppConfig): void {
   const insecure = "dev-insecure-secret-change-me";
-  if (cfg.nodeEnv === "production" && (!cfg.authSecret || cfg.authSecret === insecure)) {
+  if (cfg.nodeEnv !== "production") return;
+  if (!cfg.authSecret || cfg.authSecret === insecure) {
     throw new Error(
       "AUTH_SECRET muss in Produktion gesetzt sein (nicht der Dev-Default). Siehe generate-secrets.sh / stack.env.",
+    );
+  }
+  if (!cfg.helferSessionSecret || cfg.helferSessionSecret === insecure) {
+    throw new Error(
+      "HELFER_SESSION_SECRET muss in Produktion gesetzt sein (nicht der Dev-Default). Siehe generate-secrets.sh / stack.env.",
     );
   }
 }
