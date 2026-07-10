@@ -43,4 +43,19 @@ describe("fefoVerteilung", () => {
     expect(fefoVerteilung([{ chargeId: "a", verfall: "2026-08", rest: 5 }], 0)).toEqual([]);
     expect(fefoVerteilung([], 5)).toEqual([]);
   });
+  it("splits across 3+ chargen in verfall order", () => {
+    const r = fefoVerteilung(
+      [
+        { chargeId: "c", verfall: "2027-06", rest: 10 },
+        { chargeId: "a", verfall: "2026-08", rest: 2 },
+        { chargeId: "b", verfall: "2026-12", rest: 2 },
+      ],
+      5,
+    );
+    expect(r).toEqual([
+      { chargeId: "a", menge: 2 },
+      { chargeId: "b", menge: 2 },
+      { chargeId: "c", menge: 1 },
+    ]);
+  });
 });

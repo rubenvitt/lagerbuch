@@ -14,4 +14,7 @@ describe("bestellvorschlag", () => {
     expect(vorschlagsmenge(10, 10, 2)).toBe(0);
     expect(vorschlagsmenge(25, 10, 2)).toBe(0);
   });
+  it("clamps to 0 when a faktor < 1 makes the raw suggestion negative", () => {
+    expect(vorschlagsmenge(9, 10, 0.5)).toBe(0);
+  });
 });

@@ -45,10 +45,15 @@ const BaseEnvSchema = z.object({
   AUTH_DEV_LOGIN: boolEnv,
 });
 
-const EnvSchema = BaseEnvSchema.refine(
-  (e) => !(e.AUTH_DEV_LOGIN && e.NODE_ENV === "production"),
-  { message: "AUTH_DEV_LOGIN darf in production nicht aktiv sein" },
-);
+const EnvSchema = BaseEnvSchema.superRefine((e, ctx) => {
+  if (e.AUTH_DEV_LOGIN && e.NODE_ENV === "production") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["AUTH_DEV_LOGIN"],
+      message: "AUTH_DEV_LOGIN darf in production nicht aktiv sein",
+    });
+  }
+});
 
 export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
   const parsed = EnvSchema.safeParse(env);

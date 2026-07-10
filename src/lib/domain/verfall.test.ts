@@ -28,4 +28,14 @@ describe("verfallStatus", () => {
     const s = verfallStatus("2028-02", opts, new Date("2028-02-01T00:00:00Z"));
     expect(s.tage).toBeGreaterThanOrEqual(28);
   });
+  it("pins local-time month-end semantics near a day boundary", () => {
+    // Local time (no Z): 30 minutes before 2026-07-31 23:59:59.999 local,
+    // which is when "2026-07" expires. Locks in that verfallStatus compares
+    // in local time, not UTC (TZ is pinned to Europe/Berlin for the suite).
+    const nearBoundary = new Date("2026-07-31T23:30:00");
+    const s = verfallStatus("2026-07", opts, nearBoundary);
+    expect(s.abgelaufen).toBe(false);
+    expect(s.tage).toBe(1);
+    expect(s.ampel).toBe("rot");
+  });
 });
