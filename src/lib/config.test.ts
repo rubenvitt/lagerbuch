@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConfig } from "./config";
+import { assertProductionSecrets, parseConfig } from "./config";
 
 describe("parseConfig", () => {
   it("applies defaults for an empty environment", () => {
@@ -60,5 +60,35 @@ describe("parseConfig", () => {
       AUTH_DEV_LOGIN: "true",
     } as unknown as NodeJS.ProcessEnv);
     expect(c.authDevLogin).toBe(true);
+  });
+});
+
+describe("assertProductionSecrets", () => {
+  it("throws in production with the dev-default AUTH_SECRET", () => {
+    const c = { ...parseConfig({} as NodeJS.ProcessEnv), nodeEnv: "production" };
+    expect(() => assertProductionSecrets(c)).toThrow();
+  });
+
+  it("throws in production with an empty AUTH_SECRET", () => {
+    const c = {
+      ...parseConfig({} as NodeJS.ProcessEnv),
+      nodeEnv: "production",
+      authSecret: "",
+    };
+    expect(() => assertProductionSecrets(c)).toThrow();
+  });
+
+  it("does not throw in production with a real AUTH_SECRET", () => {
+    const c = {
+      ...parseConfig({} as NodeJS.ProcessEnv),
+      nodeEnv: "production",
+      authSecret: "a-real-secret",
+    };
+    expect(() => assertProductionSecrets(c)).not.toThrow();
+  });
+
+  it("does not throw outside production with the dev-default AUTH_SECRET", () => {
+    const c = { ...parseConfig({} as NodeJS.ProcessEnv), nodeEnv: "development" };
+    expect(() => assertProductionSecrets(c)).not.toThrow();
   });
 });

@@ -79,3 +79,22 @@ export function parseConfig(env: NodeJS.ProcessEnv): AppConfig {
 }
 
 export const config = parseConfig(process.env);
+
+/**
+ * Runtime-only guard against a forgeable-admin deploy: AUTH_SECRET signs the
+ * JWT carrying `isAdmin`, and its dev default is public (this repo is
+ * public), so production must never run with it unset or left at the
+ * default. This is intentionally NOT part of parseConfig/EnvSchema: `next
+ * build` runs with NODE_ENV=production and no AUTH_SECRET set, and the
+ * `config` singleton above is evaluated at build time, so throwing here
+ * during parseConfig would break `pnpm build`. Call this at server startup
+ * instead (see src/instrumentation.ts).
+ */
+export function assertProductionSecrets(cfg: AppConfig): void {
+  const insecure = "dev-insecure-secret-change-me";
+  if (cfg.nodeEnv === "production" && (!cfg.authSecret || cfg.authSecret === insecure)) {
+    throw new Error(
+      "AUTH_SECRET muss in Produktion gesetzt sein (nicht der Dev-Default). Siehe generate-secrets.sh / stack.env.",
+    );
+  }
+}

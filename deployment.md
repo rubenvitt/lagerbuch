@@ -61,8 +61,17 @@ docker compose --env-file stack.env up -d
 `IMAGE_TAG` auf den vorherigen Tag zurücksetzen, dann `pull` + `up -d`.
 Migrationen sind additiv (expand/contract) – Rollback gefahrlos (ab M1).
 
-## Backups (ab M1)
-Der Container schreibt nächtliche SQLite-Snapshots nach `/data/backups/`
-(Retention 14 Tage) im Named Volume `lagerbuch_data`. Die Host-Sicherung
-nimmt diese Dateien konsistent mit. Restore = Container stoppen, Snapshot
-nach `/data/lagerbuch.db` kopieren, Container starten.
+## Backups (geplant, noch nicht aktiv)
+Ein automatischer nächtlicher SQLite-Snapshot-Job nach `/data/backups/`
+(Retention 14 Tage) ist geplant, aber **noch nicht implementiert**
+(vorgesehen für ein späteres Milestone, ab M6). Der Container schreibt
+aktuell **keine** Backups von selbst – verlasse dich bis dahin nicht darauf
+und richte eine eigene, manuelle Sicherung ein.
+
+Bis der Job existiert: Sicherung selbst organisieren, z. B. per Cron auf dem
+Host über das Named Volume `lagerbuch_data` (Container kurz stoppen oder ein
+konsistentes Snapshot-Verfahren für SQLite nutzen, dann `lagerbuch.db`
+kopieren).
+
+Restore (weiterhin manuell): Container stoppen, gesicherte Kopie nach
+`/data/lagerbuch.db` zurückspielen, Container starten.
