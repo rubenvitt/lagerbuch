@@ -18,11 +18,46 @@
  * even starts, guarantees the schema is durably on disk before any
  * dev-server connection — first or fifteenth — ever opens the file.
  */
-import { applyMigrations, getDb } from "@/db";
-import { ensureHandlager } from "@/db/seed-handlager";
+import { eq } from "drizzle-orm";
+import { applyMigrations, getDb, type DB } from "@/db";
+import { ensureHandlager, HANDLAGER_ID } from "@/db/seed-handlager";
+import { artikel, buchungen, chargen, newId, tokens } from "@/db/schema";
 import { assertProductionSecrets, config } from "@/lib/config";
+
+// Aktiver Token mit bekanntem Code + Artikel mit Bestand > 0, für
+// e2e/helfer-flow.spec.ts (Einlösen → Entnahme). Idempotent, analog zu
+// ensureHandlager.
+const E2E_TOKEN_CODE = "111-111";
+
+function ensureE2eHelferFixtures(db: DB): void {
+  db.insert(tokens)
+    .values({ id: "e2e-token", code: E2E_TOKEN_CODE, label: "E2E", aktiv: true, createdAt: new Date(), createdBy: "e2e" })
+    .onConflictDoNothing()
+    .run();
+
+  db.insert(artikel)
+    .values({ id: "e2e-artikel", name: "E2E Verbandpäckchen", einheit: "Stk", fach: "A1", mindestbestand: 0, aktiv: true, createdAt: new Date() })
+    .onConflictDoNothing()
+    .run();
+
+  db.insert(chargen)
+    .values({ id: "e2e-charge", artikelId: "e2e-artikel", chargenNr: "E2E-001", verfall: "2030-01", createdAt: new Date() })
+    .onConflictDoNothing()
+    .run();
+
+  const bestehend = db.select().from(buchungen).where(eq(buchungen.chargeId, "e2e-charge")).get();
+  if (!bestehend) {
+    db.insert(buchungen)
+      .values({
+        id: newId(), ts: new Date(), typ: "zugang", artikelId: "e2e-artikel", chargeId: "e2e-charge",
+        lagerortId: HANDLAGER_ID, menge: 10, quelleTyp: "system", quelleId: "e2e", kommentar: null,
+      })
+      .run();
+  }
+}
 
 assertProductionSecrets(config);
 applyMigrations(getDb());
 ensureHandlager(getDb());
+ensureE2eHelferFixtures(getDb());
 console.log(`[e2e] migrated + seeded ${config.databasePath}`);

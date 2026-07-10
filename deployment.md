@@ -50,6 +50,14 @@ Der Container hat zusätzlich einen eingebauten HEALTHCHECK
 Leite `https://<deine-domain>` → `http://<host>:<HOST_PORT>` weiter.
 `APP_BASE_URL` muss exakt der öffentlichen URL entsprechen.
 
+- Der Reverse-Proxy **muss `X-Forwarded-For`** an den Container weiterreichen
+  – sonst greift das Rate-Limit für Token-Gate/`/t` global statt pro
+  Client-IP.
+- **`HELFER_SESSION_SECRET`** ist in Produktion Pflicht (Start wirft sonst);
+  via `generate-secrets.sh` erzeugen (siehe Konfiguration oben).
+- Das Rate-Limit (5 Versuche/Minute/IP) ist prozesslokal (In-Memory) und
+  **resettet bei Container-Neustart** – bewusst, kein Redis.
+
 ## Update
 ```bash
 # stack.env: IMAGE_TAG anpassen (Staging bleibt edge)
