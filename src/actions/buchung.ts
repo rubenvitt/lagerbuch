@@ -26,6 +26,14 @@ export async function bucheZugang(input: z.input<typeof ZugangSchema>, db: DB = 
     if (v.neueCharge) {
       chargeId = newId();
       tx.insert(chargen).values({ id: chargeId, artikelId: v.artikelId, chargenNr: v.neueCharge.chargenNr, verfall: v.neueCharge.verfall, createdAt: new Date() }).run();
+    } else {
+      // A crafted request could pass a chargeId that belongs to a different article; without
+      // this check the zugang would book onto the wrong article's stock (phantom, un-withdrawable
+      // Bestand on the target article).
+      const charge = tx.select().from(chargen).where(eq(chargen.id, chargeId)).get();
+      if (!charge || charge.artikelId !== v.artikelId) {
+        throw new Error("Charge gehört nicht zu diesem Artikel");
+      }
     }
     tx.insert(buchungen).values({
       id: newId(), ts: new Date(), typ: "zugang", artikelId: v.artikelId, chargeId,
