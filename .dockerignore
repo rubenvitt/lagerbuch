@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+data
+stack.env
+.env
+.env*.local
+e2e
+playwright-report
+test-results
+coverage
+docs
+**/*.test.ts
+**/*.test.tsx
