@@ -74,22 +74,29 @@ export function journalEintraege(db: DB, limit = 100) {
 export function kennzahlen(db: DB) {
   const now = new Date();
   const arts = db.select().from(artikel).where(eq(artikel.aktiv, true)).all();
+  const allBu = db.select().from(buchungen).all();
+  const restProCharge = bestandProCharge(allBu.map((x) => ({ chargeId: x.chargeId, menge: x.menge })));
+
   let unterMindest = 0,
     offeneBestellungen = 0;
   for (const a of arts) {
-    const bu = db.select().from(buchungen).where(eq(buchungen.artikelId, a.id)).all();
-    const b = bestand(bu.map((x) => ({ menge: x.menge })));
+    const b = bestand(allBu.filter((x) => x.artikelId === a.id).map((x) => ({ menge: x.menge })));
     if (braucht(b, a.mindestbestand)) {
       unterMindest++;
       if (!a.bestelltAt) offeneBestellungen++;
     }
   }
+
   const opts = { kritisch: config.warnTageKritisch, faellig: config.warnTageFaellig };
-  const chs = db.select().from(chargen).all();
-  const chargenKritisch = chs.filter((c) => {
-    const s = verfallStatus(c.verfall, opts, now);
-    return s.ampel !== "gruen";
-  }).length;
-  const buchungenGesamt = db.select().from(buchungen).all().length;
+  const chargenKritisch = db
+    .select()
+    .from(chargen)
+    .all()
+    .filter((c) => {
+      if ((restProCharge.get(c.id) ?? 0) <= 0) return false; // depleted → not a risk
+      return verfallStatus(c.verfall, opts, now).ampel !== "gruen";
+    }).length;
+
+  const buchungenGesamt = allBu.length;
   return { unterMindest, chargenKritisch, offeneBestellungen, buchungenGesamt };
 }
