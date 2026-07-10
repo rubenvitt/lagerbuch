@@ -23,6 +23,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Lagerbuch",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
