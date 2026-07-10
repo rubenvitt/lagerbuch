@@ -38,7 +38,10 @@ export default defineConfig({
           // e2e runs must never touch (or wipe) the developer's own dev DB.
           DATABASE_PATH: "./.data/e2e.db",
         },
-        reuseExistingServer: !process.env.CI,
+        // Always spawn a fresh server: reusing a developer's already-running `pnpm dev`
+        // would point e2e at ./.data/dev.db instead of the throwaway ./.data/e2e.db,
+        // writing test data into (and reading stale state from) their live dev DB.
+        reuseExistingServer: false,
         timeout: 120_000,
       },
 });

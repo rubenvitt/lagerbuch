@@ -21,17 +21,22 @@ function openDatabase(path: string): Database.Database {
   return sqlite;
 }
 
-let _sqlite: Database.Database | undefined;
-let _db: DB | undefined;
+// Cache the connection on globalThis (the standard Next.js dev pattern): `next dev`
+// re-evaluates this module on every HMR/reload, so plain module-scope variables would
+// otherwise be reset, opening extra sqlite connections or missing a fresh migration.
+// Stable in production (one process, module loaded once), so this doesn't change
+// production behavior. createTestDb() builds its own connection directly, not via
+// getDb(), so it is unaffected too.
+const globalForDb = globalThis as unknown as { __lagerbuchSqlite?: Database.Database; __lagerbuchDb?: DB };
 
 export function getSqlite(): Database.Database {
-  if (!_sqlite) _sqlite = openDatabase(config.databasePath);
-  return _sqlite;
+  if (!globalForDb.__lagerbuchSqlite) globalForDb.__lagerbuchSqlite = openDatabase(config.databasePath);
+  return globalForDb.__lagerbuchSqlite;
 }
 
 export function getDb(): DB {
-  if (!_db) _db = drizzle(getSqlite(), { schema });
-  return _db;
+  if (!globalForDb.__lagerbuchDb) globalForDb.__lagerbuchDb = drizzle(getSqlite(), { schema });
+  return globalForDb.__lagerbuchDb;
 }
 
 export const MIGRATIONS_FOLDER = "./drizzle";

@@ -5,7 +5,7 @@ import { artikelListe, journalEintraege, kennzahlen } from "@/db/queries";
 import { verfallStatus } from "@/lib/domain/verfall";
 import { braucht } from "@/lib/domain/vorschlag";
 import { config } from "@/lib/config";
-import { chargeText, fmtTs, typLabel } from "@/lib/format";
+import { chargeText, chipTone, fmtTs, typLabel } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +69,7 @@ export default function VerwaltungHome() {
                   </span>
                 )}
                 {a.ablauf && a.naechsteCharge && (
-                  <span className={`chip chip-${a.ablauf.ampel}`}>
+                  <span className={`chip chip-${chipTone(a.ablauf.ampel)}`}>
                     Charge {chargeText(a.ablauf, a.naechsteCharge.verfall)}
                   </span>
                 )}
