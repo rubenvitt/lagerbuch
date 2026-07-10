@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js
+/.next/
+/out/
+/build/
+next-env.d.ts
+
+# Env & secrets
+stack.env
+.env
+.env.local
+.env*.local
+
+# Runtime data volume & SQLite
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Test & tooling artifacts
+/coverage/
+/playwright-report/
+/test-results/
+/.playwright/
+
+# Editor / OS
+.DS_Store
+*.log
+.idea/
+.vscode/
