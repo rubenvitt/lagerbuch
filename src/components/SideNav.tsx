@@ -1,0 +1,30 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { History, LayoutDashboard, Package, Upload } from "lucide-react";
+import type { ComponentType } from "react";
+
+const NAV: { href: string; label: string; icon: ComponentType<{ size?: number }> }[] = [
+  { href: "/verwaltung", label: "Übersicht", icon: LayoutDashboard },
+  { href: "/verwaltung/artikel", label: "Artikel", icon: Package },
+  { href: "/verwaltung/journal", label: "Journal", icon: History },
+  { href: "/verwaltung/import", label: "Import", icon: Upload },
+];
+
+export function SideNav() {
+  const pathname = usePathname();
+  return (
+    <nav className="snav">
+      {NAV.map(({ href, label, icon: Icon }) => {
+        const active = href === "/verwaltung" ? pathname === href : pathname.startsWith(href);
+        return (
+          <Link key={href} href={href} className={`sitem${active ? " on" : ""}`}>
+            <Icon size={17} />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}

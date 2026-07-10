@@ -1,5 +1,7 @@
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
+import { LogOut } from "lucide-react";
+import { SideNav } from "@/components/SideNav";
 
 export default async function VerwaltungLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -13,7 +15,7 @@ export default async function VerwaltungLayout({ children }: { children: React.R
           </div>
           <div className="brandsub">Verwaltung</div>
         </div>
-        <div style={{ flex: 1 }} />
+        <SideNav />
         <form
           action={async () => {
             "use server";
@@ -21,7 +23,8 @@ export default async function VerwaltungLayout({ children }: { children: React.R
           }}
         >
           <button className="sitem" type="submit">
-            Abmelden
+            <LogOut size={17} />
+            <span className="logout-label">Abmelden</span>
           </button>
         </form>
       </aside>
