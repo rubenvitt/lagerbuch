@@ -4,6 +4,7 @@ export function sanitizeReturnTo(raw: string | null | undefined): string | null 
   if (!raw || typeof raw !== "string") return null;
   if (!raw.startsWith("/")) return null;
   if (raw.startsWith("//")) return null;
+  if (raw.startsWith("/\\")) return null; // Browser normalisieren "/\..." zu "//..." (protokoll-relativ)
   if (raw.includes(":")) return null; // z. B. "/x:foo" oder eingeschmuggelte Schemata
   return raw;
 }

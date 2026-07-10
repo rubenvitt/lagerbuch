@@ -11,6 +11,10 @@ describe("sanitizeReturnTo", () => {
     expect(sanitizeReturnTo("https://evil.example")).toBeNull();
     expect(sanitizeReturnTo("javascript:alert(1)")).toBeNull();
   });
+  it("verwirft Backslash-Präfixe (Browser normalisieren '/\\' zu '//')", () => {
+    expect(sanitizeReturnTo("/\\evil.example")).toBeNull();
+    expect(sanitizeReturnTo("/\\/evil.example")).toBeNull();
+  });
   it("verwirft nicht mit / beginnende und leere Werte", () => {
     expect(sanitizeReturnTo("helfer")).toBeNull();
     expect(sanitizeReturnTo(null)).toBeNull();
