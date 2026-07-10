@@ -1,0 +1,25 @@
+services:
+  lagerbuch:
+    image: ghcr.io/rubenvitt/lagerbuch:${IMAGE_TAG:-edge}
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - TZ=${TZ:-Europe/Berlin}
+      - APP_NAME=${APP_NAME:-Lagerbuch}
+      - APP_ORG=${APP_ORG:-}
+      - APP_TAGLINE=${APP_TAGLINE:-Materialverwaltung}
+      - APP_BASE_URL=${APP_BASE_URL}
+      - DATABASE_PATH=/data/lagerbuch.db
+      - AUTH_SECRET=${AUTH_SECRET}
+      - HELFER_SESSION_SECRET=${HELFER_SESSION_SECRET}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_ADMIN_GROUP=${OIDC_ADMIN_GROUP:-lagerbuch-admin}
+    volumes:
+      - lagerbuch_data:/data
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+
+volumes:
+  lagerbuch_data:
