@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-vi.mock("@/actions/session", () => ({ requireAdmin: async () => ({ userId: "admin1" }) }));
+vi.mock("@/actions/session", () => ({
+  requireAdmin: async () => ({ userId: "admin1" }),
+  requireHelfer: async () => ({ tokenId: "tok1", code: "831-042" }),
+}));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { createTestDb } from "@/db/testing";
 import { artikel, chargen, buchungen, newId } from "@/db/schema";
@@ -7,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { bestand } from "@/lib/domain/bestand";
 import { ensureHandlager } from "@/db/seed-handlager";
 import { bucheZugang, bucheEntnahme } from "./buchung";
+import { bucheEntnahmeHelfer } from "./buchung";
 
 function seedArtikel(db = createTestDb()) {
   // The FK on buchungen.lagerortId requires the Handlager lagerort to exist;
@@ -89,5 +93,22 @@ describe("bucheEntnahme", () => {
   it("rejects menge: 0", async () => {
     const { db, id } = seedArtikel();
     await expect(bucheEntnahme({ artikelId: id, menge: 0 }, db)).rejects.toThrow();
+  });
+});
+
+describe("bucheEntnahmeHelfer", () => {
+  it("bucht FEFO mit quelleTyp=token und quelleId=code", async () => {
+    const { db, id } = seedArtikel();
+    await bucheZugang({ artikelId: id, menge: 4, neueCharge: { chargenNr: "H", verfall: "2027-01" } }, db);
+    const { gebucht } = await bucheEntnahmeHelfer({ artikelId: id, menge: 3 }, db);
+    expect(gebucht).toBe(3);
+    const entn = db.select().from(buchungen).where(eq(buchungen.typ, "entnahme")).all();
+    expect(entn.length).toBeGreaterThan(0);
+    expect(entn.every((b) => b.quelleTyp === "token" && b.quelleId === "831-042")).toBe(true);
+  });
+  it("kappt bei Übermenge", async () => {
+    const { db, id } = seedArtikel();
+    await bucheZugang({ artikelId: id, menge: 2, neueCharge: { chargenNr: "H", verfall: "2027-01" } }, db);
+    expect((await bucheEntnahmeHelfer({ artikelId: id, menge: 99 }, db)).gebucht).toBe(2);
   });
 });
