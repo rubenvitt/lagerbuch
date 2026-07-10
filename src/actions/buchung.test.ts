@@ -6,7 +6,7 @@ import { artikel, chargen, buchungen, newId } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { bestand } from "@/lib/domain/bestand";
 import { ensureHandlager } from "@/db/seed-handlager";
-import { bucheZugang } from "./buchung";
+import { bucheZugang, bucheEntnahme } from "./buchung";
 
 function seedArtikel(db = createTestDb()) {
   // The FK on buchungen.lagerortId requires the Handlager lagerort to exist;
@@ -30,5 +30,24 @@ describe("bucheZugang", () => {
     const { db, id } = seedArtikel();
     await bucheZugang({ artikelId: id, menge: 3, neueCharge: { chargenNr: "N", verfall: "2099-12" } }, db);
     expect(db.select().from(artikel).where(eq(artikel.id, id)).get()!.bestelltAt).toBeNull();
+  });
+});
+
+describe("bucheEntnahme", () => {
+  it("entnahme distributes FEFO and caps at Bestand", async () => {
+    const { db, id } = seedArtikel();
+    await bucheZugang({ artikelId: id, menge: 3, neueCharge: { chargenNr: "E", verfall: "2026-08" } }, db);
+    await bucheZugang({ artikelId: id, menge: 10, neueCharge: { chargenNr: "L", verfall: "2028-01" } }, db);
+    const { gebucht } = await bucheEntnahme({ artikelId: id, menge: 5 }, db);
+    expect(gebucht).toBe(5);
+    // earliest charge fully drained (3), later charge -2 → bestand 8
+    const bu = db.select().from(buchungen).where(eq(buchungen.artikelId, id)).all();
+    expect(bestand(bu.map((b) => ({ menge: b.menge })))).toBe(8);
+  });
+  it("caps entnahme at available Bestand", async () => {
+    const { db, id } = seedArtikel();
+    await bucheZugang({ artikelId: id, menge: 3, neueCharge: { chargenNr: "E", verfall: "2026-08" } }, db);
+    const { gebucht } = await bucheEntnahme({ artikelId: id, menge: 99 }, db);
+    expect(gebucht).toBe(3);
   });
 });
