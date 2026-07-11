@@ -40,10 +40,14 @@ export default function VerwaltungHome() {
           <b>{k.unterMindest}</b>
           <div>Artikel unter Mindestbestand</div>
         </div>
-        <div className={`kpi ${k.chargenKritisch ? "gelb" : "ok"}`}>
+        <Link className={`kpi ${k.chargenKritisch ? "gelb" : "ok"}`} href="/verwaltung/verfall">
           <b>{k.chargenKritisch}</b>
-          <div>Chargen bald fällig / abgelaufen</div>
-        </div>
+          <div>Chargen bald fällig / kritisch</div>
+        </Link>
+        <Link className={`kpi ${k.chargenAbgelaufen ? "rot" : "ok"}`} href="/verwaltung/verfall">
+          <b>{k.chargenAbgelaufen}</b>
+          <div>abgelaufen — aussondern nötig</div>
+        </Link>
         <div className="kpi">
           <b>{k.offeneBestellungen}</b>
           <div>offene Bestellpositionen</div>
