@@ -12,6 +12,7 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
   const [vehId, setVehId] = useState<string | null>(fahrzeuge.length === 1 ? fahrzeuge[0].id : null);
   const [ist, setIst] = useState<Record<string, number>>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   if (fahrzeuge.length === 0) return <div className="card cardpad">Keine Fahrzeuge angelegt. Die Verwaltung muss zuerst ein Fahrzeug + Soll pflegen.</div>;
@@ -37,10 +38,15 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
   const fehlSumme = fehl.reduce((s, f) => s + f.fehlt, 0);
 
   function abschluss() {
+    setErr(null);
     start(async () => {
-      await checkAbschluss({ fahrzeugId: vehId!, positionen: positionen.map((p) => ({ sollPositionId: p.id, ist: ist[p.id] ?? p.soll })) });
-      setMsg(`Check abgeschlossen – ${fehl.length} Fehlposition(en) abgebucht`);
-      setIst({});
+      try {
+        await checkAbschluss({ fahrzeugId: vehId!, positionen: positionen.map((p) => ({ sollPositionId: p.id, ist: ist[p.id] ?? p.soll })) });
+        setMsg(`Check abgeschlossen – ${fehl.length} Fehlposition(en) abgebucht`);
+        setIst({});
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Fehler beim Abschließen – bitte erneut versuchen");
+      }
     });
   }
 
@@ -76,6 +82,7 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
           </div>
         </div>
       ))}
+      {err && <div className="card cardpad"><div className="gateerr">{err}</div></div>}
       {positionen.length > 0 && (
         <div className="summary">
           <div className="info">
