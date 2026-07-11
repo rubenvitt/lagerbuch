@@ -3,6 +3,7 @@ import type { DB } from "@/db";
 import { artikel, buchungen, chargen, tokens } from "@/db/schema";
 import { bestand, bestandProCharge } from "@/lib/domain/bestand";
 import { verfallStatus } from "@/lib/domain/verfall";
+import type { Ampel } from "@/lib/domain/verfall";
 import { braucht } from "@/lib/domain/vorschlag";
 import { config } from "@/lib/config";
 import { chargeText } from "@/lib/format";
@@ -122,6 +123,39 @@ export function artikelDetailHelfer(db: DB, id: string) {
     bestand: d.bestand,
     chargen,
   };
+}
+
+export type VerfallEintrag = {
+  chargeId: string; chargenNr: string; verfall: string; rest: number;
+  ampel: Ampel; abgelaufen: boolean; text: string;
+  artikelId: string; artikelName: string; einheit: string; fach: string;
+};
+
+export function verfallListe(db: DB): VerfallEintrag[] {
+  const now = new Date();
+  const opts = { kritisch: config.warnTageKritisch, faellig: config.warnTageFaellig };
+  const arts = new Map(db.select().from(artikel).all().map((a) => [a.id, a]));
+  const chs = db.select().from(chargen).all();
+  const rest = bestandProCharge(
+    db.select().from(buchungen).all().map((b) => ({ chargeId: b.chargeId, menge: b.menge })),
+  );
+  const eintraege: VerfallEintrag[] = [];
+  for (const c of chs) {
+    const r = rest.get(c.id) ?? 0;
+    if (r <= 0) continue;
+    const s = verfallStatus(c.verfall, opts, now);
+    if (s.ampel === "gruen") continue;
+    const a = arts.get(c.artikelId);
+    if (!a) continue;
+    eintraege.push({
+      chargeId: c.id, chargenNr: c.chargenNr, verfall: c.verfall, rest: r,
+      ampel: s.ampel, abgelaufen: s.abgelaufen, text: chargeText(s, c.verfall),
+      artikelId: a.id, artikelName: a.name, einheit: a.einheit, fach: a.fach,
+    });
+  }
+  const rank = (e: VerfallEintrag) => (e.abgelaufen ? 0 : e.ampel === "rot" ? 1 : 2);
+  eintraege.sort((x, y) => rank(x) - rank(y) || x.verfall.localeCompare(y.verfall));
+  return eintraege;
 }
 
 export function tokenListe(db: DB) {

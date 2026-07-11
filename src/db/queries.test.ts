@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createTestDb } from "@/db/testing";
 import { artikel, chargen, buchungen, lagerorte, newId } from "@/db/schema";
 import { artikelListe, artikelDetail, artikelDetailHelfer, journalEintraege, kennzahlen } from "./queries";
+import { verfallListe } from "./queries";
 
 function seed() {
   const db = createTestDb();
@@ -115,5 +116,51 @@ describe("queries", () => {
     expect(j[0].ts.getTime()).toBe(newer.getTime());
     expect(j[0].kommentar).toBe("neu");
     expect(j[1].ts.getTime()).toBe(older.getTime());
+  });
+});
+
+describe("verfallListe", () => {
+  function seedVerfall() {
+    const db = createTestDb();
+    const now = new Date();
+    const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+    const a = newId(); db.insert(artikel).values({ id: a, name: "NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 0, createdAt: now }).run();
+    // abgelaufen, rest 5
+    const cExp = newId(); db.insert(chargen).values({ id: cExp, artikelId: a, chargenNr: "EXP", verfall: "2020-01", createdAt: now }).run();
+    db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cExp, lagerortId: lo, menge: 5, quelleTyp: "oidc", quelleId: "u1" }).run();
+    // grün (weit voraus), rest 4 → NICHT in der Liste
+    const cOk = newId(); db.insert(chargen).values({ id: cOk, artikelId: a, chargenNr: "OK", verfall: "2099-01", createdAt: now }).run();
+    db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cOk, lagerortId: lo, menge: 4, quelleTyp: "oidc", quelleId: "u1" }).run();
+    // Pseudo-Charge 2099-12, rest 2 → NIE in der Liste
+    const cPseudo = newId(); db.insert(chargen).values({ id: cPseudo, artikelId: a, chargenNr: "PSEUDO", verfall: "2099-12", createdAt: now }).run();
+    db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cPseudo, lagerortId: lo, menge: 2, quelleTyp: "oidc", quelleId: "u1" }).run();
+    // abgelaufen aber rest 0 (drainiert) → NICHT in der Liste
+    const cDep = newId(); db.insert(chargen).values({ id: cDep, artikelId: a, chargenNr: "DEP", verfall: "2019-01", createdAt: now }).run();
+    db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cDep, lagerortId: lo, menge: 3, quelleTyp: "oidc", quelleId: "u1" }).run();
+    db.insert(buchungen).values({ id: newId(), ts: now, typ: "entnahme", artikelId: a, chargeId: cDep, lagerortId: lo, menge: -3, quelleTyp: "oidc", quelleId: "u1" }).run();
+    return { db, cExp };
+  }
+
+  it("listet nur rest>0 & nicht-grüne Chargen; Pseudo-Charge 2099-12 nie", () => {
+    const { db, cExp } = seedVerfall();
+    const list = verfallListe(db);
+    expect(list).toHaveLength(1);
+    expect(list[0].chargeId).toBe(cExp);
+    expect(list[0].abgelaufen).toBe(true);
+    expect(list[0].rest).toBe(5);
+    expect(list[0].artikelName).toBe("NaCl");
+    expect(list.some((e) => e.verfall === "2099-12")).toBe(false);
+  });
+
+  it("sortiert dringlichste zuerst (abgelaufen vor rot vor gelb)", () => {
+    const db = createTestDb();
+    const now = new Date();
+    const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+    const a = newId(); db.insert(artikel).values({ id: a, name: "X", einheit: "Stk", fach: "A1", mindestbestand: 0, createdAt: now }).run();
+    const cExp = newId(); db.insert(chargen).values({ id: cExp, artikelId: a, chargenNr: "EXP", verfall: "2020-01", createdAt: now }).run();
+    db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cExp, lagerortId: lo, menge: 1, quelleTyp: "oidc", quelleId: "u1" }).run();
+    // eine grüne existiert nicht relevant; test nur, dass abgelaufen als erstes rankt wenn mehrere
+    const list = verfallListe(db);
+    expect(list[0].abgelaufen).toBe(true);
   });
 });

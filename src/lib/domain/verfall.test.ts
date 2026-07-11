@@ -38,4 +38,14 @@ describe("verfallStatus", () => {
     expect(s.tage).toBe(1);
     expect(s.ampel).toBe("rot");
   });
+  it("Zeitreise: eine Charge wandert grün → gelb → rot → abgelaufen", () => {
+    const verfall = "2026-09"; // Ablauf 2026-09-30 23:59:59 (lokal)
+    const o = { kritisch: 31, faellig: 56 };
+    expect(verfallStatus(verfall, o, new Date("2026-06-01T12:00:00")).ampel).toBe("gruen"); // ~121d
+    expect(verfallStatus(verfall, o, new Date("2026-08-11T12:00:00")).ampel).toBe("gelb");  // ~50d
+    expect(verfallStatus(verfall, o, new Date("2026-09-15T12:00:00")).ampel).toBe("rot");   // ~15d
+    const s = verfallStatus(verfall, o, new Date("2026-10-05T12:00:00"));
+    expect(s.abgelaufen).toBe(true);
+    expect(s.ampel).toBe("rot");
+  });
 });
