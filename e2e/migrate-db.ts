@@ -56,8 +56,34 @@ function ensureE2eHelferFixtures(db: DB): void {
   }
 }
 
+// Artikel mit einer abgelaufenen Charge (rest > 0), für
+// e2e/verfall.spec.ts (Warnliste → aussondern). Idempotent, analog zu
+// ensureE2eHelferFixtures.
+function ensureE2eVerfallFixtures(db: DB): void {
+  db.insert(artikel)
+    .values({ id: "e2e-verfall-artikel", name: "E2E Verfall NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 0, aktiv: true, createdAt: new Date() })
+    .onConflictDoNothing()
+    .run();
+
+  db.insert(chargen)
+    .values({ id: "e2e-verfall-charge", artikelId: "e2e-verfall-artikel", chargenNr: "E2E-EXP", verfall: "2020-01", createdAt: new Date() })
+    .onConflictDoNothing()
+    .run();
+
+  const bestehend = db.select().from(buchungen).where(eq(buchungen.chargeId, "e2e-verfall-charge")).get();
+  if (!bestehend) {
+    db.insert(buchungen)
+      .values({
+        id: newId(), ts: new Date(), typ: "zugang", artikelId: "e2e-verfall-artikel", chargeId: "e2e-verfall-charge",
+        lagerortId: HANDLAGER_ID, menge: 3, quelleTyp: "system", quelleId: "e2e", kommentar: null,
+      })
+      .run();
+  }
+}
+
 assertProductionSecrets(config);
 applyMigrations(getDb());
 ensureHandlager(getDb());
 ensureE2eHelferFixtures(getDb());
+ensureE2eVerfallFixtures(getDb());
 console.log(`[e2e] migrated + seeded ${config.databasePath}`);
