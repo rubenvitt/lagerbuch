@@ -1,7 +1,12 @@
-import { QrCode, X } from "lucide-react";
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ClipboardCheck, QrCode, X } from "lucide-react";
 import { beenden } from "@/app/helfer/actions";
 
 export function HelferFrame({ tokenLabel, children }: { tokenLabel: string; children: React.ReactNode }) {
+  const pathname = usePathname();
+  const checkAktiv = pathname.startsWith("/helfer/check");
   return (
     <div className="stage">
       <div className="app">
@@ -19,7 +24,8 @@ export function HelferFrame({ tokenLabel, children }: { tokenLabel: string; chil
         </header>
         <main className="content">{children}</main>
         <nav className="tabbar">
-          <span className="tab on"><QrCode size={20} /><span>Entnahme</span></span>
+          <Link className={`tab${checkAktiv ? "" : " on"}`} href="/helfer"><QrCode size={20} /><span>Entnahme</span></Link>
+          <Link className={`tab${checkAktiv ? " on" : ""}`} href="/helfer/check"><ClipboardCheck size={20} /><span>Fahrzeug-Check</span></Link>
         </nav>
       </div>
       <div className="framecap">HELFER-ANSICHT · mobile-first, läuft auf jedem Diensthandy</div>
