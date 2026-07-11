@@ -112,3 +112,12 @@ describe("bucheEntnahmeHelfer", () => {
     expect((await bucheEntnahmeHelfer({ artikelId: id, menge: 99 }, db)).gebucht).toBe(2);
   });
 });
+
+it("normale Entnahme setzt referenz=null", async () => {
+  const { db, id } = seedArtikel();
+  await bucheZugang({ artikelId: id, menge: 4, neueCharge: { chargenNr: "H", verfall: "2028-01" } }, db);
+  await bucheEntnahme({ artikelId: id, menge: 2 }, db);
+  const entn = db.select().from(buchungen).where(eq(buchungen.typ, "entnahme")).all();
+  expect(entn.length).toBeGreaterThan(0);
+  expect(entn.every((b) => b.referenz === null)).toBe(true);
+});

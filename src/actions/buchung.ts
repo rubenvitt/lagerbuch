@@ -6,8 +6,7 @@ import { getDb, type DB } from "@/db";
 import { artikel, buchungen, chargen, newId } from "@/db/schema";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { requireAdmin, requireHelfer } from "@/actions/session";
-import { fefoVerteilung } from "@/lib/domain/fefo";
-import { bestandProCharge } from "@/lib/domain/bestand";
+import { fefoAbbuchung } from "@/db/abbuchung";
 
 const ZugangSchema = z
   .object({
@@ -51,37 +50,16 @@ const EntnahmeSchema = z.object({
   kommentar: z.string().trim().optional(),
 });
 
-type Quelle = { quelleTyp: "oidc" | "token"; quelleId: string };
-
-// Gate-freier FEFO-Kern: eine Transaktion, Bestand-Kappung, gemeldete Ist-Menge.
-// Von Admin- und Helfer-Wrapper geteilt (kein Copy-Paste der Transaktion).
-function entnehmenCore(db: DB, artikelId: string, menge: number, quelle: Quelle, kommentar: string | null): { gebucht: number } {
-  let gebucht = 0;
-  db.transaction((tx) => {
-    const chs = tx.select().from(chargen).where(eq(chargen.artikelId, artikelId)).all();
-    const bu = tx.select().from(buchungen).where(eq(buchungen.artikelId, artikelId)).all();
-    const rest = bestandProCharge(bu.map((b) => ({ chargeId: b.chargeId, menge: b.menge })));
-    const chargenRest = chs.map((c) => ({ chargeId: c.id, verfall: c.verfall, rest: rest.get(c.id) ?? 0 }));
-    const verteilung = fefoVerteilung(chargenRest, menge);
-    for (const teil of verteilung) {
-      tx.insert(buchungen).values({
-        id: newId(), ts: new Date(), typ: "entnahme", artikelId, chargeId: teil.chargeId,
-        lagerortId: HANDLAGER_ID, menge: -teil.menge, quelleTyp: quelle.quelleTyp, quelleId: quelle.quelleId,
-        kommentar,
-      }).run();
-      gebucht += teil.menge;
-    }
-  });
-  return { gebucht };
-}
-
 export async function bucheEntnahme(input: z.input<typeof EntnahmeSchema>, db: DB = getDb()) {
   const { userId } = await requireAdmin();
   const v = EntnahmeSchema.parse(input);
-  const r = entnehmenCore(db, v.artikelId, v.menge, { quelleTyp: "oidc", quelleId: userId }, v.kommentar ?? null);
+  let gebucht = 0;
+  db.transaction((tx) => {
+    gebucht = fefoAbbuchung(tx, { artikelId: v.artikelId, menge: v.menge, quelle: { quelleTyp: "oidc", quelleId: userId }, kommentar: v.kommentar ?? null, referenz: null });
+  });
   revalidatePath("/verwaltung/artikel");
   revalidatePath("/verwaltung");
-  return r;
+  return { gebucht };
 }
 
 const HelferEntnahmeSchema = z.object({
@@ -92,9 +70,12 @@ const HelferEntnahmeSchema = z.object({
 export async function bucheEntnahmeHelfer(input: z.input<typeof HelferEntnahmeSchema>, db: DB = getDb()) {
   const { code } = await requireHelfer(db);
   const v = HelferEntnahmeSchema.parse(input);
-  const r = entnehmenCore(db, v.artikelId, v.menge, { quelleTyp: "token", quelleId: code }, null);
+  let gebucht = 0;
+  db.transaction((tx) => {
+    gebucht = fefoAbbuchung(tx, { artikelId: v.artikelId, menge: v.menge, quelle: { quelleTyp: "token", quelleId: code }, kommentar: null, referenz: null });
+  });
   revalidatePath(`/a/${v.artikelId}`);
   revalidatePath("/helfer");
   revalidatePath("/verwaltung");
-  return r;
+  return { gebucht };
 }
