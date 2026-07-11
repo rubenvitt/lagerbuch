@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTestDb } from "@/db/testing";
 import { artikel, chargen, buchungen, lagerorte, newId } from "@/db/schema";
 import { artikelListe, artikelDetail, artikelDetailHelfer, journalEintraege, kennzahlen } from "./queries";
@@ -154,15 +154,32 @@ describe("verfallListe", () => {
     expect(list.some((e) => e.verfall === "2099-12")).toBe(false);
   });
 
-  it("sortiert dringlichste zuerst (abgelaufen vor rot vor gelb)", () => {
+  // Zeit einfrieren, damit rot/gelb deterministisch aus den Verfall-Monaten
+  // relativ zu einem festen "jetzt" folgen (verfallListe ruft intern new Date()).
+  // Schwellen (kritisch 31 / fällig 56 Tage) sind zeit-unabhängig und gelten weiter.
+  afterEach(() => vi.useRealTimers());
+
+  it("sortiert dringlichste zuerst (abgelaufen vor rot vor gelb, Tiebreak nach verfall)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 0, 15)); // 15.01.2026
     const db = createTestDb();
     const now = new Date();
     const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
     const a = newId(); db.insert(artikel).values({ id: a, name: "X", einheit: "Stk", fach: "A1", mindestbestand: 0, createdAt: now }).run();
-    const cExp = newId(); db.insert(chargen).values({ id: cExp, artikelId: a, chargenNr: "EXP", verfall: "2020-01", createdAt: now }).run();
-    db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cExp, lagerortId: lo, menge: 1, quelleTyp: "oidc", quelleId: "u1" }).run();
-    // eine grüne existiert nicht relevant; test nur, dass abgelaufen als erstes rankt wenn mehrere
+    // Zwei abgelaufene (Tiebreak: 2020 vor 2021), eine rote (~17 Tage), eine gelbe (~45 Tage).
+    // Bewusst in verwürfelter Reihenfolge eingefügt, damit ein entfernter Tiebreak
+    // bzw. ein kaputter rank() das erwartete Ergebnis verändert.
+    const cGelb = newId(); db.insert(chargen).values({ id: cGelb, artikelId: a, chargenNr: "GELB", verfall: "2026-02", createdAt: now }).run();
+    const cExpB = newId(); db.insert(chargen).values({ id: cExpB, artikelId: a, chargenNr: "EXP-B", verfall: "2021-01", createdAt: now }).run();
+    const cRot = newId(); db.insert(chargen).values({ id: cRot, artikelId: a, chargenNr: "ROT", verfall: "2026-01", createdAt: now }).run();
+    const cExpA = newId(); db.insert(chargen).values({ id: cExpA, artikelId: a, chargenNr: "EXP-A", verfall: "2020-01", createdAt: now }).run();
+    for (const cid of [cGelb, cExpB, cRot, cExpA]) {
+      db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cid, lagerortId: lo, menge: 1, quelleTyp: "oidc", quelleId: "u1" }).run();
+    }
+
     const list = verfallListe(db);
-    expect(list[0].abgelaufen).toBe(true);
+    expect(list.map((e) => e.chargeId)).toEqual([cExpA, cExpB, cRot, cGelb]);
+    expect(list.map((e) => e.abgelaufen)).toEqual([true, true, false, false]);
+    expect(list.map((e) => e.ampel)).toEqual(["rot", "rot", "rot", "gelb"]);
   });
 });

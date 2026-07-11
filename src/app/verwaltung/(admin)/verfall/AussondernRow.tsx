@@ -22,8 +22,10 @@ export function AussondernRow({ eintrag }: { eintrag: VerfallEintragView }) {
     });
   }
 
+  // Fragment statt Wrapper-<div>: so bleibt der .row ein direktes Kind der .card,
+  // damit der .row:first-child-Trenner in globals.css korrekt greift.
   return (
-    <div>
+    <>
       <VerfallItem
         eintrag={eintrag}
         action={!open ? (
@@ -45,6 +47,6 @@ export function AussondernRow({ eintrag }: { eintrag: VerfallEintragView }) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

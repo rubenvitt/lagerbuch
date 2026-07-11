@@ -23,7 +23,12 @@ test("abgelaufene Charge aussondern → Journal-Korrektur, Warnliste leert sich"
   // Charge verschwindet aus der Warnliste
   await expect(page.locator(".row", { hasText: "E2E Verfall NaCl" })).toHaveCount(0);
 
-  // Journal zeigt die Korrekturbuchung
+  // Journal zeigt die Korrekturbuchung: die Zeile des Artikels, die den Vorgang
+  // „Korrektur" trägt (unterscheidet sie vom geseedeten Zugang), mit Grund und
+  // negativem Delta (rest 3 → -3).
   await page.goto("/verwaltung/journal");
-  await expect(page.getByText("E2E Verfall NaCl").first()).toBeVisible();
+  const korrekturZeile = page.locator("tr", { hasText: "E2E Verfall NaCl" }).filter({ hasText: "Korrektur" });
+  await expect(korrekturZeile).toBeVisible();
+  await expect(korrekturZeile).toContainText("abgelaufen 01/2020");
+  await expect(korrekturZeile).toContainText("-3");
 });
