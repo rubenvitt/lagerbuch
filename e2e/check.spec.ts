@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const CODE = "111-111"; // muss zum M2-Seed passen
+const CODE = "222-222"; // eigener Token, siehe e2e/migrate-db.ts (ensureE2eCheckFixtures)
 
 test("Helfer-Check bucht Fehlmenge mit referenz=check und erscheint in der Historie", async ({ page }) => {
   // Token einlösen

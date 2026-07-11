@@ -81,11 +81,23 @@ function ensureE2eVerfallFixtures(db: DB): void {
   }
 }
 
+// Eigener Token für e2e/check.spec.ts, damit dessen Fehlmengen-Entnahme nicht
+// den für e2e/helfer-flow.spec.ts geseedeten Token 111-111 mitbenutzt (sonst
+// bucht der Check zusätzlich mit quelleId=111-111 in dessen Journal hinein –
+// Playwright läuft alle Spec-Dateien alphabetisch in einem Worker gegen eine
+// gemeinsame DB).
+const E2E_CHECK_TOKEN_CODE = "222-222";
+
 // Fahrzeug + Soll-Position für e2e/check.spec.ts (Helfer-Check → Fehlmenge
 // → referenz=check-Buchung → Admin-Historie). Nutzt den bestehenden
 // e2e-artikel (Handlager-Bestand > 0 aus ensureE2eHelferFixtures). Idempotent,
 // analog zu ensureE2eHelferFixtures.
 function ensureE2eCheckFixtures(db: DB): void {
+  db.insert(tokens)
+    .values({ id: "e2e-check-token", code: E2E_CHECK_TOKEN_CODE, label: "E2E Check", aktiv: true, createdAt: new Date(), createdBy: "e2e" })
+    .onConflictDoNothing()
+    .run();
+
   db.insert(lagerorte)
     .values({ id: "e2e-fahrzeug", name: "E2E RTW", typ: "fahrzeug", kennung: null, aktiv: true })
     .onConflictDoNothing()
