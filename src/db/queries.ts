@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
-import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen } from "@/db/schema";
+import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks } from "@/db/schema";
 import { bestand, bestandProCharge } from "@/lib/domain/bestand";
 import { verfallStatus } from "@/lib/domain/verfall";
 import type { Ampel } from "@/lib/domain/verfall";
@@ -179,6 +179,20 @@ export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
       };
     })
     .sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.sort - y.sort);
+}
+
+export function checkHistorie(db: DB, limit = 50) {
+  const namen = new Map(db.select().from(lagerorte).all().map((l) => [l.id, l.name]));
+  return db.select().from(checks).orderBy(desc(checks.completedAt)).limit(limit).all().map((c) => {
+    let positionen = 0, fehlPositionen = 0, gebuchtGesamt = 0;
+    try {
+      const erg = JSON.parse(c.ergebnis ?? "[]") as { fehlt: number; gebucht: number }[];
+      positionen = erg.length;
+      fehlPositionen = erg.filter((e) => e.fehlt > 0).length;
+      gebuchtGesamt = erg.reduce((s, e) => s + (e.gebucht ?? 0), 0);
+    } catch { /* ergebnis unlesbar → 0 */ }
+    return { id: c.id, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, fehlPositionen, gebuchtGesamt };
+  });
 }
 
 export function tokenListe(db: DB) {
