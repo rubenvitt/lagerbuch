@@ -3,7 +3,7 @@ vi.mock("@/actions/session", () => ({ requireAdmin: async () => ({ userId: "admi
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { createTestDb } from "@/db/testing";
 import type { DB } from "@/db";
-import { lagerorte, artikel, sollPositionen, newId } from "@/db/schema";
+import { lagerorte, artikel, newId } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createFahrzeug, sollPositionSetzen, sollPositionEntfernen } from "./fahrzeuge";
 import { fahrzeugListe, sollFuerFahrzeug } from "@/db/queries";
