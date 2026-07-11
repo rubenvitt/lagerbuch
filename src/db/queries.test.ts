@@ -42,20 +42,22 @@ describe("queries", () => {
     expect(j[0].artikelName).toBe("Mullbinde");
   });
 
-  it("chargenKritisch counts an at-risk charge with rest>0 but not a depleted one", () => {
+  it("splits chargenAbgelaufen (expired, rest>0) from chargenKritisch (at-risk, not expired); depleted excluded", () => {
     const db = createTestDb();
     const now = new Date();
     const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
     const a = newId(); db.insert(artikel).values({ id: a, name: "Mullbinde", einheit: "Stk.", fach: "A2", mindestbestand: 0, createdAt: now }).run();
-    // live: past verfall (ampel != gruen) AND still has rest > 0 → counts
+    // abgelaufen mit rest>0 → chargenAbgelaufen, NICHT chargenKritisch
     const cLive = newId(); db.insert(chargen).values({ id: cLive, artikelId: a, chargenNr: "LIVE", verfall: "2020-01", createdAt: now }).run();
     db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cLive, lagerortId: lo, menge: 5, quelleTyp: "oidc", quelleId: "u1" }).run();
-    // depleted: past verfall but fully removed by an entnahme → rest 0 → NOT counted
+    // abgelaufen aber rest 0 → weder noch
     const cDep = newId(); db.insert(chargen).values({ id: cDep, artikelId: a, chargenNr: "DEP", verfall: "2019-01", createdAt: now }).run();
     db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: cDep, lagerortId: lo, menge: 3, quelleTyp: "oidc", quelleId: "u1" }).run();
     db.insert(buchungen).values({ id: newId(), ts: now, typ: "entnahme", artikelId: a, chargeId: cDep, lagerortId: lo, menge: -3, quelleTyp: "oidc", quelleId: "u1" }).run();
 
-    expect(kennzahlen(db).chargenKritisch).toBe(1);
+    const k = kennzahlen(db);
+    expect(k.chargenAbgelaufen).toBe(1); // cLive
+    expect(k.chargenKritisch).toBe(0);   // cLive ist abgelaufen (zählt dort nicht), cDep rest 0
   });
 
   it("offeneBestellungen counts under-mindest articles only until bestelltAt is set", () => {

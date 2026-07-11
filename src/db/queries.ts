@@ -90,17 +90,17 @@ export function kennzahlen(db: DB) {
   }
 
   const opts = { kritisch: config.warnTageKritisch, faellig: config.warnTageFaellig };
-  const chargenKritisch = db
-    .select()
-    .from(chargen)
-    .all()
-    .filter((c) => {
-      if ((restProCharge.get(c.id) ?? 0) <= 0) return false; // depleted → not a risk
-      return verfallStatus(c.verfall, opts, now).ampel !== "gruen";
-    }).length;
+  let chargenKritisch = 0;
+  let chargenAbgelaufen = 0;
+  for (const c of db.select().from(chargen).all()) {
+    if ((restProCharge.get(c.id) ?? 0) <= 0) continue; // depleted → kein Risiko
+    const s = verfallStatus(c.verfall, opts, now);
+    if (s.abgelaufen) chargenAbgelaufen++;
+    else if (s.ampel !== "gruen") chargenKritisch++;
+  }
 
   const buchungenGesamt = allBu.length;
-  return { unterMindest, chargenKritisch, offeneBestellungen, buchungenGesamt };
+  return { unterMindest, chargenKritisch, chargenAbgelaufen, offeneBestellungen, buchungenGesamt };
 }
 
 export function artikelDetailHelfer(db: DB, id: string) {
