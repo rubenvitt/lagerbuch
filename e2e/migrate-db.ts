@@ -21,7 +21,7 @@
 import { eq } from "drizzle-orm";
 import { applyMigrations, getDb, type DB } from "@/db";
 import { ensureHandlager, HANDLAGER_ID } from "@/db/seed-handlager";
-import { artikel, buchungen, chargen, newId, tokens } from "@/db/schema";
+import { artikel, buchungen, chargen, lagerorte, newId, sollPositionen, tokens } from "@/db/schema";
 import { assertProductionSecrets, config } from "@/lib/config";
 
 // Aktiver Token mit bekanntem Code + Artikel mit Bestand > 0, für
@@ -81,9 +81,26 @@ function ensureE2eVerfallFixtures(db: DB): void {
   }
 }
 
+// Fahrzeug + Soll-Position für e2e/check.spec.ts (Helfer-Check → Fehlmenge
+// → referenz=check-Buchung → Admin-Historie). Nutzt den bestehenden
+// e2e-artikel (Handlager-Bestand > 0 aus ensureE2eHelferFixtures). Idempotent,
+// analog zu ensureE2eHelferFixtures.
+function ensureE2eCheckFixtures(db: DB): void {
+  db.insert(lagerorte)
+    .values({ id: "e2e-fahrzeug", name: "E2E RTW", typ: "fahrzeug", kennung: null, aktiv: true })
+    .onConflictDoNothing()
+    .run();
+
+  db.insert(sollPositionen)
+    .values({ id: "e2e-soll", fahrzeugId: "e2e-fahrzeug", fachLabel: "E2E Fach", sort: 0, artikelId: "e2e-artikel", soll: 3 })
+    .onConflictDoNothing()
+    .run();
+}
+
 assertProductionSecrets(config);
 applyMigrations(getDb());
 ensureHandlager(getDb());
 ensureE2eHelferFixtures(getDb());
 ensureE2eVerfallFixtures(getDb());
+ensureE2eCheckFixtures(getDb());
 console.log(`[e2e] migrated + seeded ${config.databasePath}`);
