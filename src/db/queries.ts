@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
-import { artikel, buchungen, chargen, tokens } from "@/db/schema";
+import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen } from "@/db/schema";
 import { bestand, bestandProCharge } from "@/lib/domain/bestand";
 import { verfallStatus } from "@/lib/domain/verfall";
 import type { Ampel } from "@/lib/domain/verfall";
@@ -156,6 +156,29 @@ export function verfallListe(db: DB): VerfallEintrag[] {
   const rank = (e: VerfallEintrag) => (e.abgelaufen ? 0 : e.ampel === "rot" ? 1 : 2);
   eintraege.sort((x, y) => rank(x) - rank(y) || x.verfall.localeCompare(y.verfall));
   return eintraege;
+}
+
+export function fahrzeugListe(db: DB) {
+  return db.select().from(lagerorte).where(eq(lagerorte.typ, "fahrzeug")).all()
+    .map((f) => ({ id: f.id, name: f.name, kennung: f.kennung, aktiv: f.aktiv }));
+}
+
+export type SollZeile = { id: string; fachLabel: string; sort: number; artikelId: string; artikelName: string; einheit: string; handlagerFach: string; soll: number; bestand: number };
+
+export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
+  const arts = new Map(db.select().from(artikel).all().map((a) => [a.id, a]));
+  const allBu = db.select().from(buchungen).all();
+  const rows = db.select().from(sollPositionen).where(eq(sollPositionen.fahrzeugId, fahrzeugId)).all();
+  return rows
+    .map((p) => {
+      const a = arts.get(p.artikelId);
+      const b = bestand(allBu.filter((x) => x.artikelId === p.artikelId).map((x) => ({ menge: x.menge })));
+      return {
+        id: p.id, fachLabel: p.fachLabel, sort: p.sort, artikelId: p.artikelId,
+        artikelName: a?.name ?? "–", einheit: a?.einheit ?? "", handlagerFach: a?.fach ?? "", soll: p.soll, bestand: b,
+      };
+    })
+    .sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.sort - y.sort);
 }
 
 export function tokenListe(db: DB) {
