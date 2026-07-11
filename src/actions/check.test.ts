@@ -60,4 +60,14 @@ describe("checkAbschluss", () => {
     const { db, fz } = seed();
     await expect(checkAbschluss({ fahrzeugId: fz, positionen: [{ sollPositionId: "nope", ist: 0 }] }, db)).rejects.toThrow();
   });
+  it("Atomarität (alles-oder-nichts): rollt eine bereits gebuchte Teil-Entnahme bei späterem Fehler zurück", async () => {
+    const { db, fz, pos } = seed();
+    // Erste Position (gültig, Fehlmenge 3 → bucht Entnahme), zweite Position (fremd → wirft).
+    await expect(
+      checkAbschluss({ fahrzeugId: fz, positionen: [{ sollPositionId: pos, ist: 1 }, { sollPositionId: "nope", ist: 0 }] }, db),
+    ).rejects.toThrow();
+    // Rollback: weder Entnahme noch checks-Zeile dürfen persistiert sein.
+    expect(db.select().from(buchungen).where(eq(buchungen.typ, "entnahme")).all()).toHaveLength(0);
+    expect(db.select().from(checks).all()).toHaveLength(0);
+  });
 });
