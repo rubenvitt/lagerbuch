@@ -109,10 +109,21 @@ function ensureE2eCheckFixtures(db: DB): void {
     .run();
 }
 
+// Artikel unter Mindestbestand (bestand 0 < mindestbestand 5, keine
+// Buchung/Charge), für e2e/inventur.spec.ts (Bestellvorschlag-Liste ist
+// sonst leer). Idempotent, analog zu ensureE2eVerfallFixtures.
+function ensureE2eBestellungFixtures(db: DB): void {
+  db.insert(artikel)
+    .values({ id: "e2e-bestellung-artikel", name: "E2E Bestellung NaCl", einheit: "Fl.", fach: "C3", mindestbestand: 5, aktiv: true, createdAt: new Date() })
+    .onConflictDoNothing()
+    .run();
+}
+
 assertProductionSecrets(config);
 applyMigrations(getDb());
 ensureHandlager(getDb());
 ensureE2eHelferFixtures(getDb());
 ensureE2eVerfallFixtures(getDb());
 ensureE2eCheckFixtures(getDb());
+ensureE2eBestellungFixtures(getDb());
 console.log(`[e2e] migrated + seeded ${config.databasePath}`);
