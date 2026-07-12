@@ -182,3 +182,24 @@ input, select { font: inherit; }
   .side .brandsub,.side .logout-label{display:none}
   .main{height:auto;padding:16px 14px 60px}
 }
+
+/* ——— Etiketten (Bildschirm) ——— */
+.etikettbogen{display:grid;grid-template-columns:repeat(auto-fill,48.5mm);gap:2mm}
+.etikett{width:48.5mm;height:25.4mm;box-sizing:border-box;display:flex;align-items:center;gap:2.5mm;padding:2mm;border:1px dashed var(--linie);border-radius:4px;overflow:hidden;cursor:pointer;background:#fff}
+.etikett.deselected{opacity:.35}
+.etikett img{width:20mm;height:20mm;flex:none}
+.etikett input{margin:0;flex:none}
+.etikett-txt{min-width:0}
+.etikett-titel{font:700 11px var(--display);line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.etikett-sub{font:600 9px var(--mono);color:var(--stahl)}
+
+/* ——— Etiketten (Druck): nur der Bogen, nur gewaehlte, ohne Chrome ——— */
+@media print{
+  @page{margin:8mm}
+  body *{visibility:hidden}
+  .etikettbogen,.etikettbogen *{visibility:visible}
+  .etikettbogen{position:absolute;left:0;top:0;width:100%;gap:0}
+  .etikett{border:none;border-radius:0;opacity:1}
+  .etikett.deselected{display:none !important}
+  .etikett input,.no-print{display:none !important}
+}
