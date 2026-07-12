@@ -1,7 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
 import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks } from "@/db/schema";
-import { bestand, bestandProCharge } from "@/lib/domain/bestand";
+import { bestand, bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
+import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { verfallStatus } from "@/lib/domain/verfall";
 import type { Ampel } from "@/lib/domain/verfall";
 import { braucht, vorschlagsmenge } from "@/lib/domain/vorschlag";
@@ -19,11 +20,12 @@ export type ArtikelZeile = {
   naechsteCharge: { chargenNr: string; verfall: string } | null;
 };
 
-// helper: rest per charge for one article
-function chargenMitRest(db: DB, artikelId: string): ChargeZeile[] {
+// helper: rest per charge for one article AT ONE lagerort (default Handlager). Since vehicles now
+// carry their own bookings, an unscoped rest would sum Handlager + Fahrzeug for the same charge.
+function chargenMitRest(db: DB, artikelId: string, lagerortId: string = HANDLAGER_ID): ChargeZeile[] {
   const chs = db.select().from(chargen).where(eq(chargen.artikelId, artikelId)).all();
   const bu = db.select().from(buchungen).where(eq(buchungen.artikelId, artikelId)).all();
-  const rest = bestandProCharge(bu.map((b) => ({ chargeId: b.chargeId, menge: b.menge })));
+  const rest = bestandProCharge(bu.filter((b) => b.lagerortId === lagerortId).map((b) => ({ chargeId: b.chargeId, menge: b.menge })));
   return chs.map((c) => ({ id: c.id, chargenNr: c.chargenNr, verfall: c.verfall, rest: rest.get(c.id) ?? 0 }));
 }
 
@@ -41,7 +43,8 @@ export function artikelListe(db: DB): ArtikelZeile[] {
       einheit: a.einheit,
       fach: a.fach,
       mindestbestand: a.mindestbestand,
-      bestand: bestand(bu.map((b) => ({ menge: b.menge }))),
+      // Verwaltungsliste zeigt den HANDLAGER-Bestand (nicht fahrzeuginklusiv).
+      bestand: bestandProLagerort(bu.map((b) => ({ lagerortId: b.lagerortId, menge: b.menge })), HANDLAGER_ID),
       naechsteCharge: naechste ? { chargenNr: naechste.chargenNr, verfall: naechste.verfall } : null,
     };
   });
@@ -53,7 +56,9 @@ export function artikelDetail(db: DB, id: string) {
   const bu = db.select().from(buchungen).where(eq(buchungen.artikelId, id)).orderBy(desc(buchungen.ts)).all();
   return {
     artikel: a,
-    bestand: bestand(bu.map((b) => ({ menge: b.menge }))),
+    // Admin-Detail: Handlager-Bestand + Handlager-Chargen. Der Buchungs-Verlauf bleibt bewusst
+    // lagerort-übergreifend (zeigt auch Umlagerungen aufs Fahrzeug als Aktivität).
+    bestand: bestandProLagerort(bu.map((b) => ({ lagerortId: b.lagerortId, menge: b.menge })), HANDLAGER_ID),
     chargen: chargenMitRest(db, id),
     buchungen: bu.slice(0, 8).map((b) => ({ ts: b.ts, typ: b.typ, menge: b.menge, kommentar: b.kommentar, quelleId: b.quelleId })),
   };
@@ -77,12 +82,16 @@ export function kennzahlen(db: DB) {
   const now = new Date();
   const arts = db.select().from(artikel).where(eq(artikel.aktiv, true)).all();
   const allBu = db.select().from(buchungen).all();
-  const restProCharge = bestandProCharge(allBu.map((x) => ({ chargeId: x.chargeId, menge: x.menge })));
+  // Verfall-KPIs zählen nur den HANDLAGER-Rest je Charge — konsistent mit verfallListe() und der
+  // Aussondern-Aktion (beide Handlager-gebunden). Fahrzeug-Chargen laufen ggf. dort ab und werden
+  // über den nächsten Fahrzeug-Check bereinigt, nicht über die Handlager-Verfallsliste.
+  const restProCharge = bestandProLagerortUndCharge(allBu.map((x) => ({ lagerortId: x.lagerortId, chargeId: x.chargeId, menge: x.menge })), HANDLAGER_ID);
 
   let unterMindest = 0,
     offeneBestellungen = 0;
   for (const a of arts) {
-    const b = bestand(allBu.filter((x) => x.artikelId === a.id).map((x) => ({ menge: x.menge })));
+    // Mindestbestand ist eine HANDLAGER-Nachschubschwelle → nur Handlager-Bestand zählt.
+    const b = bestandProLagerort(allBu.filter((x) => x.artikelId === a.id).map((x) => ({ lagerortId: x.lagerortId, menge: x.menge })), HANDLAGER_ID);
     if (braucht(b, a.mindestbestand)) {
       unterMindest++;
       if (!a.bestelltAt) offeneBestellungen++;
@@ -136,8 +145,12 @@ export function verfallListe(db: DB): VerfallEintrag[] {
   const opts = { kritisch: config.warnTageKritisch, faellig: config.warnTageFaellig };
   const arts = new Map(db.select().from(artikel).all().map((a) => [a.id, a]));
   const chs = db.select().from(chargen).all();
-  const rest = bestandProCharge(
-    db.select().from(buchungen).all().map((b) => ({ chargeId: b.chargeId, menge: b.menge })),
+  // Verfallsliste = HANDLAGER-Rest je Charge (siehe kennzahlen): eine komplett aufs Fahrzeug
+  // umgelagerte abgelaufene Charge erscheint nicht mehr hier, sonst würde der Aussondern-Button
+  // (Handlager-only) reproduzierbar fehlschlagen.
+  const rest = bestandProLagerortUndCharge(
+    db.select().from(buchungen).all().map((b) => ({ lagerortId: b.lagerortId, chargeId: b.chargeId, menge: b.menge })),
+    HANDLAGER_ID,
   );
   const eintraege: VerfallEintrag[] = [];
   for (const c of chs) {
@@ -163,7 +176,12 @@ export function fahrzeugListe(db: DB) {
     .map((f) => ({ id: f.id, name: f.name, kennung: f.kennung, aktiv: f.aktiv }));
 }
 
-export type SollZeile = { id: string; fachLabel: string; sort: number; artikelId: string; artikelName: string; einheit: string; handlagerFach: string; soll: number; bestand: number };
+export type SollZeile = {
+  id: string; fachLabel: string; sort: number; artikelId: string; artikelName: string; einheit: string;
+  handlagerFach: string; soll: number;
+  fahrzeugBestand: number; // aktueller recorded Bestand AUF dem Fahrzeug (Ausgangspunkt des Abgleichs)
+  handlagerBestand: number; // im Handlager verfügbar zum Nachfüllen
+};
 
 export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
   const arts = new Map(db.select().from(artikel).all().map((a) => [a.id, a]));
@@ -172,10 +190,12 @@ export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
   return rows
     .map((p) => {
       const a = arts.get(p.artikelId);
-      const b = bestand(allBu.filter((x) => x.artikelId === p.artikelId).map((x) => ({ menge: x.menge })));
+      const bu = allBu.filter((x) => x.artikelId === p.artikelId).map((x) => ({ lagerortId: x.lagerortId, menge: x.menge }));
       return {
         id: p.id, fachLabel: p.fachLabel, sort: p.sort, artikelId: p.artikelId,
-        artikelName: a?.name ?? "–", einheit: a?.einheit ?? "", handlagerFach: a?.fach ?? "", soll: p.soll, bestand: b,
+        artikelName: a?.name ?? "–", einheit: a?.einheit ?? "", handlagerFach: a?.fach ?? "", soll: p.soll,
+        fahrzeugBestand: bestandProLagerort(bu, fahrzeugId),
+        handlagerBestand: bestandProLagerort(bu, HANDLAGER_ID),
       };
     })
     .sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.sort - y.sort);
@@ -184,14 +204,21 @@ export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
 export function checkHistorie(db: DB, limit = 50) {
   const namen = new Map(db.select().from(lagerorte).all().map((l) => [l.id, l.name]));
   return db.select().from(checks).orderBy(desc(checks.completedAt)).limit(limit).all().map((c) => {
-    let positionen = 0, fehlPositionen = 0, gebuchtGesamt = 0;
+    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0;
     try {
-      const erg = JSON.parse(c.ergebnis ?? "[]") as { fehlt: number; gebucht: number }[];
-      positionen = erg.length;
-      fehlPositionen = erg.filter((e) => e.fehlt > 0).length;
-      gebuchtGesamt = erg.reduce((s, e) => s + (e.gebucht ?? 0), 0);
+      const raw = JSON.parse(c.ergebnis ?? "[]");
+      if (Array.isArray(raw)) {
+        // ALTES Format (vor Fahrzeugbestand): Array pro Position {fehlt, gebucht}.
+        positionen = raw.length;
+        nachgefuelltGesamt = raw.reduce((s: number, e: { gebucht?: number }) => s + (e.gebucht ?? 0), 0);
+      } else {
+        // NEUES Format: {positionen:[…], artikel:[{korrektur, nachfuellGebucht}]}.
+        positionen = (raw.positionen ?? []).length;
+        nachgefuelltGesamt = (raw.artikel ?? []).reduce((s: number, a: { nachfuellGebucht?: number }) => s + (a.nachfuellGebucht ?? 0), 0);
+        korrigiertGesamt = (raw.artikel ?? []).reduce((s: number, a: { korrektur?: number }) => s + Math.abs(a.korrektur ?? 0), 0);
+      }
     } catch { /* ergebnis unlesbar → 0 */ }
-    return { id: c.id, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, fehlPositionen, gebuchtGesamt };
+    return { id: c.id, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt };
   });
 }
 
@@ -201,7 +228,8 @@ export function bestellvorschlag(db: DB): BestellZeile[] {
   const allBu = db.select().from(buchungen).all();
   return db.select().from(artikel).where(eq(artikel.aktiv, true)).all()
     .map((a) => {
-      const b = bestand(allBu.filter((x) => x.artikelId === a.id).map((x) => ({ menge: x.menge })));
+      // Bestellvorschlag basiert auf dem HANDLAGER-Bestand (Nachschub ins Zentrallager).
+      const b = bestandProLagerort(allBu.filter((x) => x.artikelId === a.id).map((x) => ({ lagerortId: x.lagerortId, menge: x.menge })), HANDLAGER_ID);
       return { id: a.id, name: a.name, einheit: a.einheit, fach: a.fach, bestand: b, mindestbestand: a.mindestbestand, vorschlag: vorschlagsmenge(b, a.mindestbestand, config.bestellFaktor), bestellt: Boolean(a.bestelltAt) };
     })
     .filter((z) => braucht(z.bestand, z.mindestbestand));

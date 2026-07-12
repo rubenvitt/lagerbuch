@@ -39,7 +39,7 @@ export const buchungen = sqliteTable(
   {
     id: text("id").primaryKey(),
     ts: integer("ts", { mode: "timestamp" }).notNull(),
-    typ: text("typ", { enum: ["zugang", "entnahme", "korrektur"] }).notNull(),
+    typ: text("typ", { enum: ["zugang", "entnahme", "korrektur", "umlagerung"] }).notNull(),
     artikelId: text("artikel_id").notNull().references(() => artikel.id),
     chargeId: text("charge_id").notNull().references(() => chargen.id),
     lagerortId: text("lagerort_id").notNull().references(() => lagerorte.id),
@@ -73,7 +73,7 @@ export const tokens = sqliteTable("tokens", {
   id: text("id").primaryKey(),
   code: text("code").notNull().unique(),
   label: text("label").notNull(),
-  scopeLagerortId: text("scope_lagerort_id").references(() => lagerorte.id),
+  scopeLagerortId: text("scope_lagerort_id").references(() => lagerorte.id), // null = Handlager
   aktiv: integer("aktiv", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   createdBy: text("created_by").notNull(),

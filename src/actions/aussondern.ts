@@ -6,7 +6,7 @@ import { getDb, type DB } from "@/db";
 import { buchungen, chargen, newId } from "@/db/schema";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { requireAdmin } from "@/actions/session";
-import { bestandProCharge } from "@/lib/domain/bestand";
+import { bestandProLagerortUndCharge } from "@/lib/domain/bestand";
 import { verfallStatus } from "@/lib/domain/verfall";
 import { config } from "@/lib/config";
 
@@ -27,9 +27,14 @@ export async function aussondern(input: z.input<typeof AussondernSchema>, db: DB
     if (!verfallStatus(charge.verfall, opts, new Date()).abgelaufen) {
       throw new Error("Nur abgelaufene Chargen können ausgesondert werden");
     }
+    // Aussondern betrifft nur den HANDLAGER-Rest dieser Charge. Läge dieselbe Charge auch in
+    // einem Fahrzeug, würde ein globaler Rest den Handlager-Bestand ins Negative aussondern.
     const bu = tx.select().from(buchungen).where(eq(buchungen.chargeId, v.chargeId)).all();
-    const rest = bestandProCharge(bu.map((b) => ({ chargeId: b.chargeId, menge: b.menge }))).get(v.chargeId) ?? 0;
-    if (rest <= 0) throw new Error("Charge hat keinen Restbestand");
+    const rest = bestandProLagerortUndCharge(
+      bu.map((b) => ({ lagerortId: b.lagerortId, chargeId: b.chargeId, menge: b.menge })),
+      HANDLAGER_ID,
+    ).get(v.chargeId) ?? 0;
+    if (rest <= 0) throw new Error("Charge hat keinen Restbestand im Handlager");
     tx.insert(buchungen).values({
       id: newId(), ts: new Date(), typ: "korrektur",
       artikelId: charge.artikelId, chargeId: charge.id, lagerortId: HANDLAGER_ID,

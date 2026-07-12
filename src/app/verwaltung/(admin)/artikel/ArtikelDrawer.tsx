@@ -26,6 +26,7 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
   const [einheit, setEinheit] = useState<string>(EINHEITEN[0]);
 
   const [menge, setMenge] = useState(1);
+  const [entnahmeZiel, setEntnahmeZiel] = useState<string>(""); // "" = Handlager/Verbrauch
   const [chargeAuswahl, setChargeAuswahl] = useState<string>(NEUE_CHARGE);
   const [chargenNr, setChargenNr] = useState("");
   const [verfall, setVerfall] = useState("");
@@ -95,7 +96,7 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
     setBusy(true);
     setError(null);
     try {
-      await bucheEntnahme({ artikelId: id, menge });
+      await bucheEntnahme({ artikelId: id, menge, zielLagerortId: entnahmeZiel || undefined });
       setMenge(1);
       await afterMutation();
     } catch (e) {
@@ -223,8 +224,19 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
               <span style={{ fontSize: 13.5, color: "var(--stahl)" }}>Menge</span>
               <Stepper wert={menge} setWert={setMenge} />
             </div>
+            {detail.fahrzeuge.length > 0 && (
+              <div>
+                <span className="label">Ziel</span>
+                <select className="input" value={entnahmeZiel} onChange={(e) => setEntnahmeZiel(e.target.value)}>
+                  <option value="">Handlager (Verbrauch)</option>
+                  {detail.fahrzeuge.map((f) => (
+                    <option key={f.id} value={f.id}>Umlagern → {f.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <button className="btn btn-rot" disabled={busy || detail.bestand === 0} onClick={onEntnahme}>
-              <Minus size={15} /> Entnahme
+              <Minus size={15} /> {entnahmeZiel ? "Umlagern" : "Entnahme"}
             </button>
 
             <div style={{ borderTop: "1px solid var(--linie)", paddingTop: 10, display: "grid", gap: 8 }}>

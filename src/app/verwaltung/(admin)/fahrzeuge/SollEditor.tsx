@@ -29,11 +29,11 @@ export function SollEditor({ fahrzeugId, positionen, artikel }: { fahrzeugId: st
             <div className="row" key={p.id}>
               <div className="rowmain">
                 <div className="rowname">{p.artikelName}</div>
-                <div className="rowmeta"><span className="fach">{p.handlagerFach}</span><small>Bestand {p.bestand} {p.einheit}</small></div>
+                <div className="rowmeta"><span className="fach">{p.handlagerFach}</span><small>auf Fzg. {p.fahrzeugBestand} · Handlager {p.handlagerBestand} {p.einheit}</small></div>
               </div>
-              <input className="input" style={{ width: 64 }} type="number" min={1} defaultValue={p.soll}
+              <input className="input" style={{ width: 64, flex: "none" }} type="number" min={1} defaultValue={p.soll}
                 onBlur={(e) => { const n = Number(e.target.value); if (n >= 1 && n !== p.soll) start(async () => { await sollPositionSetzen({ id: p.id, fahrzeugId, fachLabel: p.fachLabel, artikelId: p.artikelId, soll: n, sort: p.sort }); }); }} />
-              <button className="btn btn-ghost" disabled={pending} onClick={() => start(async () => { await sollPositionEntfernen({ id: p.id }); })}><Trash2 size={15} /></button>
+              <button className="btn btn-ghost" style={{ flex: "none", width: "auto" }} disabled={pending} onClick={() => start(async () => { await sollPositionEntfernen({ id: p.id }); })}><Trash2 size={15} /></button>
             </div>
           ))}
         </div>

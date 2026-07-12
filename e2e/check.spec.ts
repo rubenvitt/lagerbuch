@@ -17,9 +17,13 @@ test("Helfer-Check bucht Fehlmenge mit referenz=check und erscheint in der Histo
   const veh = page.getByText("E2E RTW");
   if (await veh.count()) await veh.first().click();
 
-  // Ist unter Soll setzen: den ersten Stepper-Minus einmal drücken (Soll 3 → Ist 2 → Fehlmenge 1)
+  // Schritt 1 (Zählen): Ist unter Soll setzen (Soll 3 → Ist 2 → Nachfüllbedarf 1), dann Weiter.
   await page.getByRole("button", { name: "Menge verringern" }).first().click();
-  await page.getByRole("button", { name: "Abschließen" }).click();
+  await page.getByRole("button", { name: "Weiter" }).click();
+
+  // Schritt 2 (Nachfüllen): Transparenz-Anzeige sichtbar, dann bestätigen.
+  await expect(page.getByText(/aus dem Handlager aufs Fahrzeug/i)).toBeVisible();
+  await page.getByRole("button", { name: /Gelegt & abschließen/ }).click();
   await expect(page.getByText(/Check abgeschlossen/)).toBeVisible();
 
   // Admin: Historie zeigt den Check (Demo-Login)

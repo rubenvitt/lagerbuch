@@ -1,6 +1,6 @@
 "use server";
 import { getDb } from "@/db";
-import { artikelDetail } from "@/db/queries";
+import { artikelDetail, fahrzeugListe } from "@/db/queries";
 import { requireAdmin } from "@/actions/session";
 import { verfallStatus, type Ampel } from "@/lib/domain/verfall";
 import { chargeText } from "@/lib/format";
@@ -28,6 +28,7 @@ export type ArtikelDetailResult = {
   bestand: number;
   chargen: ArtikelDetailCharge[];
   buchungen: ArtikelDetailBuchung[];
+  fahrzeuge: { id: string; name: string }[]; // mögliche Umlagerungs-Ziele für die Entnahme
 } | null;
 
 export async function getDetail(id: string): Promise<ArtikelDetailResult> {
@@ -57,5 +58,6 @@ export async function getDetail(id: string): Promise<ArtikelDetailResult> {
     bestand: detail.bestand,
     chargen,
     buchungen: detail.buchungen,
+    fahrzeuge: fahrzeugListe(getDb()).filter((f) => f.aktiv).map((f) => ({ id: f.id, name: f.name })),
   };
 }

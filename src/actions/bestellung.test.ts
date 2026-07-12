@@ -4,6 +4,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/lib/config", () => ({ config: { bestellFaktor: 2, warnTageKritisch: 31, warnTageFaellig: 56 } }));
 import { createTestDb } from "@/db/testing";
 import { lagerorte, artikel, chargen, buchungen, newId } from "@/db/schema";
+import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { eq } from "drizzle-orm";
 import { markiereBestellt } from "./bestellung";
 import { bestellvorschlag } from "@/db/queries";
@@ -11,7 +12,7 @@ import { bestellvorschlag } from "@/db/queries";
 function seed() {
   const db = createTestDb();
   const now = new Date();
-  const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+  const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
   // unter Mindest: bestand 2 < min 8 → vorschlag = 2*8-2 = 14
   const a = newId(); db.insert(artikel).values({ id: a, name: "NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 8, createdAt: now }).run();
   const c = newId(); db.insert(chargen).values({ id: c, artikelId: a, chargenNr: "C", verfall: "2028-01", createdAt: now }).run();

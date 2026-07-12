@@ -35,6 +35,7 @@ const TYP_LABEL: Record<string, string> = {
   zugang: "Wareneingang",
   entnahme: "Entnahme",
   korrektur: "Korrektur",
+  umlagerung: "Umlagerung",
 };
 
 /** German label for a Buchung's `typ`, matching the mockup's wording. */

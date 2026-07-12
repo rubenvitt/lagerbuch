@@ -3,10 +3,11 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb, type DB } from "@/db";
-import { artikel, buchungen, chargen, newId } from "@/db/schema";
+import { artikel, buchungen, chargen, lagerorte, newId } from "@/db/schema";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { requireAdmin, requireHelfer } from "@/actions/session";
 import { fefoAbbuchung } from "@/db/abbuchung";
+import { umlagerung } from "@/db/umlagerung";
 
 const ZugangSchema = z
   .object({
@@ -48,14 +49,25 @@ const EntnahmeSchema = z.object({
   artikelId: z.string().min(1),
   menge: z.coerce.number().int().positive(),
   kommentar: z.string().trim().optional(),
+  // Optionales Ziel-Fahrzeug: gesetzt → Umlagerung Handlager→Fahrzeug (Verbrauch bleibt am
+  // Fahrzeug, sinkt erst beim nächsten Check); leer/Handlager → normaler Verbrauch aus dem Handlager.
+  zielLagerortId: z.string().min(1).optional(),
 });
 
 export async function bucheEntnahme(input: z.input<typeof EntnahmeSchema>, db: DB = getDb()) {
   const { userId } = await requireAdmin();
   const v = EntnahmeSchema.parse(input);
+  const quelle = { quelleTyp: "oidc" as const, quelleId: userId };
+  const zielFahrzeug = v.zielLagerortId && v.zielLagerortId !== HANDLAGER_ID ? v.zielLagerortId : null;
   let gebucht = 0;
   db.transaction((tx) => {
-    gebucht = fefoAbbuchung(tx, { artikelId: v.artikelId, menge: v.menge, quelle: { quelleTyp: "oidc", quelleId: userId }, kommentar: v.kommentar ?? null, referenz: null });
+    if (zielFahrzeug) {
+      const ziel = tx.select().from(lagerorte).where(eq(lagerorte.id, zielFahrzeug)).get();
+      if (!ziel || ziel.typ !== "fahrzeug" || !ziel.aktiv) throw new Error("Ziel ist kein gültiges, aktives Fahrzeug");
+      gebucht = umlagerung(tx, { artikelId: v.artikelId, menge: v.menge, vonLagerortId: HANDLAGER_ID, nachLagerortId: zielFahrzeug, quelle, kommentar: v.kommentar ?? null, referenz: `entnahme-ziel:${zielFahrzeug}` }).umgelagert;
+    } else {
+      gebucht = fefoAbbuchung(tx, { artikelId: v.artikelId, menge: v.menge, quelle, kommentar: v.kommentar ?? null, referenz: null }).gebucht;
+    }
   });
   revalidatePath("/verwaltung/artikel");
   revalidatePath("/verwaltung");
@@ -72,7 +84,7 @@ export async function bucheEntnahmeHelfer(input: z.input<typeof HelferEntnahmeSc
   const v = HelferEntnahmeSchema.parse(input);
   let gebucht = 0;
   db.transaction((tx) => {
-    gebucht = fefoAbbuchung(tx, { artikelId: v.artikelId, menge: v.menge, quelle: { quelleTyp: "token", quelleId: code }, kommentar: null, referenz: null });
+    gebucht = fefoAbbuchung(tx, { artikelId: v.artikelId, menge: v.menge, quelle: { quelleTyp: "token", quelleId: code }, kommentar: null, referenz: null }).gebucht;
   });
   revalidatePath(`/a/${v.artikelId}`);
   revalidatePath("/helfer");

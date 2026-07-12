@@ -7,6 +7,7 @@ import { buchungen, chargen, newId } from "@/db/schema";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { requireAdmin } from "@/actions/session";
 import { fefoAbbuchung } from "@/db/abbuchung";
+import { bestandProLagerort } from "@/lib/domain/bestand";
 
 const Schema = z.object({
   kommentar: z.string().trim().min(1, "Kommentar erforderlich"),
@@ -23,8 +24,9 @@ export async function inventurKorrektur(input: z.input<typeof Schema>, db: DB = 
   let korrigiert = 0;
   db.transaction((tx) => {
     for (const p of v.positionen) {
+      // Inventur zählt den HANDLAGER-Bestand — Fahrzeugbestand derselben Charge darf nicht mitzählen.
       const bu = tx.select().from(buchungen).where(eq(buchungen.artikelId, p.artikelId)).all();
-      const bestandJetzt = bu.reduce((s, b) => s + b.menge, 0);
+      const bestandJetzt = bestandProLagerort(bu.map((b) => ({ lagerortId: b.lagerortId, menge: b.menge })), HANDLAGER_ID);
       const diff = p.ist - bestandJetzt;
       if (diff === 0) continue;
       if (diff < 0) {

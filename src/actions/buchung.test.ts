@@ -5,7 +5,7 @@ vi.mock("@/actions/session", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { createTestDb } from "@/db/testing";
-import { artikel, chargen, buchungen, newId } from "@/db/schema";
+import { artikel, chargen, buchungen, lagerorte, newId } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { bestand } from "@/lib/domain/bestand";
 import { ensureHandlager } from "@/db/seed-handlager";
@@ -95,6 +95,31 @@ describe("bucheEntnahme", () => {
     const { db, id } = seedArtikel();
     await expect(bucheEntnahme({ artikelId: id, menge: 0 }, db)).rejects.toThrow();
   });
+  it("mit Ziel-Fahrzeug lagert Handlager→Fahrzeug um (statt Verbrauch)", async () => {
+    const { db, id } = seedArtikel();
+    await bucheZugang({ artikelId: id, menge: 10, neueCharge: { chargenNr: "Z", verfall: "2028-01" } }, db);
+    const fz = newId();
+    db.insert(lagerorte).values({ id: fz, name: "RTW 1", typ: "fahrzeug", aktiv: true }).run();
+    const { gebucht } = await bucheEntnahme({ artikelId: id, menge: 4, zielLagerortId: fz }, db);
+    expect(gebucht).toBe(4);
+    const bu = db.select().from(buchungen).where(eq(buchungen.artikelId, id)).all();
+    // Handlager 10 → 6, Fahrzeug 0 → 4, Gesamt unverändert (Umlagerung, kein Verbrauch)
+    expect(bu.filter((b) => b.lagerortId === "handlager").reduce((s, b) => s + b.menge, 0)).toBe(6);
+    expect(bu.filter((b) => b.lagerortId === fz).reduce((s, b) => s + b.menge, 0)).toBe(4);
+    expect(bu.every((b) => b.typ !== "entnahme")).toBe(true); // Umlagerung, nicht Entnahme
+  });
+  it("weist ein Ziel ab, das kein Fahrzeug ist", async () => {
+    const { db, id } = seedArtikel();
+    await bucheZugang({ artikelId: id, menge: 5, neueCharge: { chargenNr: "Z", verfall: "2028-01" } }, db);
+    await expect(bucheEntnahme({ artikelId: id, menge: 2, zielLagerortId: "handlager-x" }, db)).rejects.toThrow();
+  });
+  it("weist ein INAKTIVES Fahrzeug als Ziel ab", async () => {
+    const { db, id } = seedArtikel();
+    await bucheZugang({ artikelId: id, menge: 5, neueCharge: { chargenNr: "Z", verfall: "2028-01" } }, db);
+    const fz = newId();
+    db.insert(lagerorte).values({ id: fz, name: "Alt-RTW", typ: "fahrzeug", aktiv: false }).run();
+    await expect(bucheEntnahme({ artikelId: id, menge: 2, zielLagerortId: fz }, db)).rejects.toThrow();
+  });
 });
 
 describe("bucheEntnahmeHelfer", () => {
@@ -128,8 +153,8 @@ describe("fefoAbbuchung typ", () => {
     const { db, id } = seedArtikel();
     await bucheZugang({ artikelId: id, menge: 5, neueCharge: { chargenNr: "K", verfall: "2028-01" } }, db);
     db.transaction((tx) => {
-      const g = fefoAbbuchung(tx, { artikelId: id, menge: 2, quelle: { quelleTyp: "oidc", quelleId: "u1" }, kommentar: "inv", referenz: "inventur:x", typ: "korrektur" });
-      expect(g).toBe(2);
+      const { gebucht } = fefoAbbuchung(tx, { artikelId: id, menge: 2, quelle: { quelleTyp: "oidc", quelleId: "u1" }, kommentar: "inv", referenz: "inventur:x", typ: "korrektur" });
+      expect(gebucht).toBe(2);
     });
     const korr = db.select().from(buchungen).where(eq(buchungen.typ, "korrektur")).all();
     expect(korr).toHaveLength(1);

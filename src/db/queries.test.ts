@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTestDb } from "@/db/testing";
 import { artikel, chargen, buchungen, lagerorte, newId } from "@/db/schema";
+import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { artikelListe, artikelDetail, artikelDetailHelfer, journalEintraege, kennzahlen } from "./queries";
 import { verfallListe } from "./queries";
 
 function seed() {
   const db = createTestDb();
   const now = new Date();
-  const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+  const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
   const a = newId(); db.insert(artikel).values({ id: a, name: "Mullbinde", einheit: "Stk.", fach: "A2", mindestbestand: 20, createdAt: now }).run();
   const cEarly = newId(); db.insert(chargen).values({ id: cEarly, artikelId: a, chargenNr: "E", verfall: "2026-08", createdAt: now }).run();
   const cLate = newId(); db.insert(chargen).values({ id: cLate, artikelId: a, chargenNr: "L", verfall: "2028-01", createdAt: now }).run();
@@ -45,7 +46,7 @@ describe("queries", () => {
   it("splits chargenAbgelaufen (expired, rest>0) from chargenKritisch (at-risk, not expired); depleted excluded", () => {
     const db = createTestDb();
     const now = new Date();
-    const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+    const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
     const a = newId(); db.insert(artikel).values({ id: a, name: "Mullbinde", einheit: "Stk.", fach: "A2", mindestbestand: 0, createdAt: now }).run();
     // abgelaufen mit rest>0 → chargenAbgelaufen, NICHT chargenKritisch
     const cLive = newId(); db.insert(chargen).values({ id: cLive, artikelId: a, chargenNr: "LIVE", verfall: "2020-01", createdAt: now }).run();
@@ -64,7 +65,7 @@ describe("queries", () => {
     const now = new Date();
     // unordered: under mindestbestand, bestelltAt null → counts
     const dbA = createTestDb();
-    const loA = newId(); dbA.insert(lagerorte).values({ id: loA, name: "Handlager", typ: "lager" }).run();
+    const loA = HANDLAGER_ID; dbA.insert(lagerorte).values({ id: loA, name: "Handlager", typ: "lager" }).run();
     const aA = newId(); dbA.insert(artikel).values({ id: aA, name: "Pflaster", einheit: "Stk.", fach: "B1", mindestbestand: 20, bestelltAt: null, createdAt: now }).run();
     const cA = newId(); dbA.insert(chargen).values({ id: cA, artikelId: aA, chargenNr: "C", verfall: "2028-01", createdAt: now }).run();
     dbA.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: aA, chargeId: cA, lagerortId: loA, menge: 5, quelleTyp: "oidc", quelleId: "u1" }).run();
@@ -72,7 +73,7 @@ describe("queries", () => {
 
     // same but bestelltAt set → still under mindest, but no longer "offen"
     const dbB = createTestDb();
-    const loB = newId(); dbB.insert(lagerorte).values({ id: loB, name: "Handlager", typ: "lager" }).run();
+    const loB = HANDLAGER_ID; dbB.insert(lagerorte).values({ id: loB, name: "Handlager", typ: "lager" }).run();
     const aB = newId(); dbB.insert(artikel).values({ id: aB, name: "Pflaster", einheit: "Stk.", fach: "B1", mindestbestand: 20, bestelltAt: now, createdAt: now }).run();
     const cB = newId(); dbB.insert(chargen).values({ id: cB, artikelId: aB, chargenNr: "C", verfall: "2028-01", createdAt: now }).run();
     dbB.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: aB, chargeId: cB, lagerortId: loB, menge: 5, quelleTyp: "oidc", quelleId: "u1" }).run();
@@ -106,7 +107,7 @@ describe("queries", () => {
 
   it("journalEintraege orders by ts descending", () => {
     const db = createTestDb();
-    const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+    const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
     const a = newId(); db.insert(artikel).values({ id: a, name: "Mullbinde", einheit: "Stk.", fach: "A2", mindestbestand: 0, createdAt: new Date(2020, 0, 1) }).run();
     const c = newId(); db.insert(chargen).values({ id: c, artikelId: a, chargenNr: "C", verfall: "2028-01", createdAt: new Date(2020, 0, 1) }).run();
     const older = new Date(2020, 0, 1);
@@ -125,7 +126,7 @@ describe("verfallListe", () => {
   function seedVerfall() {
     const db = createTestDb();
     const now = new Date();
-    const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+    const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
     const a = newId(); db.insert(artikel).values({ id: a, name: "NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 0, createdAt: now }).run();
     // abgelaufen, rest 5
     const cExp = newId(); db.insert(chargen).values({ id: cExp, artikelId: a, chargenNr: "EXP", verfall: "2020-01", createdAt: now }).run();
@@ -164,7 +165,7 @@ describe("verfallListe", () => {
     vi.setSystemTime(new Date(2026, 0, 15)); // 15.01.2026
     const db = createTestDb();
     const now = new Date();
-    const lo = newId(); db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+    const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
     const a = newId(); db.insert(artikel).values({ id: a, name: "X", einheit: "Stk", fach: "A1", mindestbestand: 0, createdAt: now }).run();
     // Zwei abgelaufene (Tiebreak: 2020 vor 2021), eine rote (~17 Tage), eine gelbe (~45 Tage).
     // Bewusst in verwürfelter Reihenfolge eingefügt, damit ein entfernter Tiebreak

@@ -17,9 +17,9 @@ export default function ChecksPage() {
               <div className="rowname">{c.fahrzeugName}</div>
               <div className="rowmeta">
                 <span className="jts">{c.completedAt ? fmtTs(c.completedAt) : "–"}</span>
-                {c.fehlPositionen > 0
-                  ? <span className="chip chip-rot">{c.fehlPositionen} Fehlpos. · {c.gebuchtGesamt} abgebucht</span>
-                  : <span className="chip chip-ok">vollständig</span>}
+                {c.nachgefuelltGesamt > 0 && <span className="chip chip-rot">{c.nachgefuelltGesamt} aus Handlager nachgefüllt</span>}
+                {c.korrigiertGesamt > 0 && <span className="chip chip-gelb">{c.korrigiertGesamt} korrigiert</span>}
+                {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && <span className="chip chip-ok">vollständig</span>}
               </div>
             </div>
             <div className="bignum" style={{ fontSize: 18 }}>{c.positionen}<small>Pos.</small></div>
