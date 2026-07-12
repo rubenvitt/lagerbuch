@@ -21,7 +21,8 @@ export function TokenTable({ tokens }: { tokens: Row[] }) {
             </div>
           </div>
           <button
-            className={`btn ${t.aktiv ? "btn-ghost" : "btn-rot"}`}
+            className={`btn slim ${t.aktiv ? "btn-ghost" : "btn-rot"}`}
+            style={{ flex: "none" }}
             disabled={pending}
             onClick={() => start(() => setTokenAktiv({ id: t.id, aktiv: !t.aktiv }))}
           >
