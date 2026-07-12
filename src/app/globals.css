@@ -71,9 +71,9 @@ input, select { font: inherit; }
 .btnrow{display:flex;gap:9px}
 .stepper{display:flex;align-items:center;border:1.5px solid var(--linie);border-radius:11px;background:var(--karte)}
 .stepbtn{width:42px;height:42px;display:flex;align-items:center;justify-content:center}
-.stepval{min-width:44px;text-align:center;font-family:var(--display);font-weight:700;font-size:21px}
+.stepval{width:56px;height:42px;text-align:center;font-family:var(--display);font-weight:700;font-size:21px;background:transparent;border:0;color:inherit;padding:0}
 .stepper.sm .stepbtn{width:30px;height:30px}
-.stepper.sm .stepval{min-width:28px;font-size:15px}
+.stepper.sm .stepval{width:46px;height:30px;font-size:15px}
 .filter{font-size:12.5px;font-weight:600;border:1.5px solid var(--linie);background:var(--karte);border-radius:99px;padding:5px 12px;color:var(--stahl)}
 .filter.on{border-color:var(--tinte);color:var(--tinte)}
 .filters{display:flex;gap:7px;margin:0 2px 12px;flex-wrap:wrap}
@@ -101,9 +101,8 @@ input, select { font: inherit; }
 .tokeninput{font:600 21px var(--mono);letter-spacing:.16em;text-align:center;text-transform:uppercase}
 .gateerr{color:var(--rot);font-size:12.5px;font-weight:600}
 
-/* ——— Helfer (Phone-Frame) ——— */
-.stage{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;background:#DDE1E3}
-.app{width:100%;max-width:410px;height:calc(100vh - 62px);max-height:820px;min-height:580px;background:var(--papier);border-radius:22px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 26px 70px rgba(12,18,24,.30);position:relative}
+/* ——— Helfer (Vollbild-App) ——— */
+.app{width:100%;height:100vh;height:100dvh;background:var(--papier);overflow:hidden;display:flex;flex-direction:column;position:relative}
 .stripe{height:5px;background:var(--rot);flex:none}
 .topbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px 9px;background:var(--karte);border-bottom:1px solid var(--linie)}
 .brand{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.07em}
@@ -115,7 +114,6 @@ input, select { font: inherit; }
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 8px;color:var(--stahl);border-top:2.5px solid transparent}
 .tab.on{color:var(--rot);border-top-color:var(--rot)}
 .tab span{font-family:var(--display);font-weight:600;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase}
-.framecap{font-family:var(--mono);font-size:10.5px;color:var(--stahl);margin-top:11px;text-align:center}
 .scanwrap{position:relative;background:#14181B;border-radius:16px;height:280px;width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .scanframe{position:absolute;inset:14%}
 .scancorner{position:absolute;width:26px;height:26px;border:3px solid #fff;opacity:.9}
