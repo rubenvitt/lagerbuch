@@ -18,9 +18,14 @@ export function InventurForm({ artikel }: { artikel: Artikel[] }) {
   function abschluss() {
     setErr(null);
     if (!kommentar.trim()) { setErr("Kommentar erforderlich"); return; }
+    // Nur tatsaechlich gezaehlte (vom Nutzer angefasste) Positionen buchen. Nicht angefasste Artikel
+    // wuerden sonst mit dem veralteten Seitenlade-Snapshot als 'ist' gebucht und parallele Entnahmen
+    // still rueckgaengig machen (Lost Update); der Server rechnet diff = ist - LIVE-Bestand.
+    const positionen = Object.entries(ist).map(([artikelId, wert]) => ({ artikelId, ist: wert }));
+    if (positionen.length === 0) { setErr("Keine Zählung erfasst"); return; }
     start(async () => {
       try {
-        const r = await inventurKorrektur({ kommentar: kommentar.trim(), positionen: artikel.map((a) => ({ artikelId: a.id, ist: ist[a.id] ?? a.bestand })) });
+        const r = await inventurKorrektur({ kommentar: kommentar.trim(), positionen });
         setMsg(`Inventur gebucht – ${r.korrigiert} Position(en) korrigiert`);
         setIst({}); setKommentar("");
       } catch (e) { setErr(e instanceof Error ? e.message : "Fehler bei der Inventur"); }

@@ -25,6 +25,7 @@ test("Bestellung: Artikel als bestellt markieren toggelt den Status", async ({ p
   const firstToggle = page.getByRole("button", { name: /markieren/ }).first();
   if (await firstToggle.count()) {
     await firstToggle.click();
-    await expect(page.getByText("bestellt").first()).toBeVisible();
+    // exact:true trifft NUR den Zeilen-Chip <span>bestellt</span>, nicht die Fussnote „Bestellt …"
+    await expect(page.getByText("bestellt", { exact: true }).first()).toBeVisible();
   }
 });
