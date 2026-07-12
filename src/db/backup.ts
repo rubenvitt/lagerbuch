@@ -31,12 +31,15 @@ async function snapshot(now: Date): Promise<void> {
 }
 
 // Guardrail: darf den Startup NIEMALS brechen. Stuendlicher idempotenter Tick;
-// Snapshot nur wenn Stunde==2 und heute noch keine Datei. Aufrufer ruft nur in Produktion.
+// Snapshot ab Stunde >= 2, sofern heute noch keine Datei existiert (idempotenter Tagescheck
+// via existsSync in snapshot). Schwelle statt Gleichheit, damit die DST-Umstellungsnacht in
+// Europe/Berlin (Wanduhr springt 02:00->03:00) den Tagesbackup nicht ausfallen laesst.
+// Aufrufer ruft nur in Produktion.
 export function starteBackupJob(): void {
   try {
     const tick = () => {
       const now = new Date();
-      if (now.getHours() === 2) snapshot(now).catch((e) => console.error("[backup] snapshot:", e));
+      if (now.getHours() >= 2) snapshot(now).catch((e) => console.error("[backup] snapshot:", e));
     };
     const iv = setInterval(tick, 60 * 60 * 1000);
     iv.unref?.();

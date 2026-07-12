@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { Printer } from "lucide-react";
 
-type A = { id: string; name: string; fach: string; url: string; qr: string };
-type T = { code: string; label: string; url: string; qr: string };
+type A = { id: string; name: string; fach: string; qr: string };
+type T = { code: string; label: string; qr: string };
 
 export function EtikettenBogen({ artikel, tokens }: { artikel: A[]; tokens: T[] }) {
   const keys = [...artikel.map((a) => `a:${a.id}`), ...tokens.map((t) => `t:${t.code}`)];
