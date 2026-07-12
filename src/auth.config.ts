@@ -57,7 +57,20 @@ export const authConfig = {
   callbacks: {
     async signIn({ account, profile }) {
       if (account?.provider === "dev-login") return true;
-      if (account?.provider === "oidc") return extractGroups(profile).includes(ADMIN_GROUP);
+      if (account?.provider === "oidc") {
+        const groups = extractGroups(profile);
+        if (groups.includes(ADMIN_GROUP)) return true;
+        // Häufigste Fehlkonfiguration beim Go-live: Pocket ID liefert keinen "groups"-Claim
+        // (falscher Claim-Key) oder der User ist nicht in OIDC_ADMIN_GROUP. Diese Zeile in
+        // `docker logs` macht sichtbar, WAS ankam — statt nur stumm "Kein Zugriff".
+        console.warn(
+          `[auth] OIDC-Login abgelehnt: Admin-Gruppe "${ADMIN_GROUP}" nicht in Token-Gruppen ` +
+            `${JSON.stringify(groups)}. Vorhandene Profil-Claims: ` +
+            `[${Object.keys((profile as Record<string, unknown>) ?? {}).join(", ")}]. ` +
+            `Prüfe OIDC_ADMIN_GROUP und ob Pocket ID einen "groups"-Claim mit deiner Gruppe ausliefert.`,
+        );
+        return false;
+      }
       return false;
     },
     async jwt({ token, account, profile, user }) {
