@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarClock, ClipboardCheck, History, KeyRound, LayoutDashboard, Package, Truck, Upload } from "lucide-react";
+import { CalendarClock, ClipboardCheck, ClipboardList, History, KeyRound, LayoutDashboard, Package, ShoppingCart, Truck, Upload } from "lucide-react";
 import type { ComponentType } from "react";
 
 const NAV: { href: string; label: string; icon: ComponentType<{ size?: number }> }[] = [
@@ -11,6 +11,8 @@ const NAV: { href: string; label: string; icon: ComponentType<{ size?: number }>
   { href: "/verwaltung/verfall", label: "Verfall", icon: CalendarClock },
   { href: "/verwaltung/fahrzeuge", label: "Fahrzeuge", icon: Truck },
   { href: "/verwaltung/checks", label: "Checks", icon: ClipboardCheck },
+  { href: "/verwaltung/bestellung", label: "Bestellung", icon: ShoppingCart },
+  { href: "/verwaltung/inventur", label: "Inventur", icon: ClipboardList },
   { href: "/verwaltung/journal", label: "Journal", icon: History },
   { href: "/verwaltung/tokens", label: "Zugangs-Codes", icon: KeyRound },
   { href: "/verwaltung/import", label: "Import", icon: Upload },
