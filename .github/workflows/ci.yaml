@@ -39,25 +39,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Build image
-        run: docker build -t lagerbuch:ci .
-      - name: Run container
-        run: |
-          docker run -d --name lagerbuch -p 3000:3000 \
-            -e APP_ORG="DRK Bereitschaft Musterstadt" \
-            -e APP_BASE_URL="http://localhost:3000" \
-            lagerbuch:ci
-      - name: Wait for health
-        run: |
-          for _ in $(seq 1 30); do
-            if curl -sf http://localhost:3000/api/health; then echo " ok"; exit 0; fi
-            sleep 2
-          done
-          echo "health never became ready"; docker logs lagerbuch; exit 1
-      - name: Playwright
-        env:
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
+      # Playwright startet den Server selbst (playwright.config webServer: löscht die
+      # e2e-DB, seedet die Fixtures via e2e/migrate-db.ts und startet `next dev` mit
+      # NODE_ENV=development, Test-Secrets und AUTH_DEV_LOGIN=true). Das ist exakt der
+      # lokal grüne Pfad. Ein produktions-echter Container scheidet hier bewusst aus:
+      # er verlangt echte Secrets UND verbietet den e2e-Demo-Login, und gegen einen
+      # externen Base-URL werden die Fixtures nicht geseedet.
+      - name: E2E (Playwright)
         run: pnpm exec playwright test
+      # Smoke: sicherstellen, dass das Produktions-Image weiterhin baut (relevant auf
+      # PRs, wo der publish-Job nicht läuft). Nur Build, kein Run/Health.
+      - name: Docker build smoke
+        run: docker build -t lagerbuch:ci .
 
   publish:
     needs: [check, e2e]
