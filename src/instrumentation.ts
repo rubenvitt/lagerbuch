@@ -6,5 +6,14 @@ export async function register() {
     assertProductionSecrets(config);
     applyMigrations(getDb());
     ensureHandlager(getDb());
+
+    if (config.nodeEnv === "production") {
+      try {
+        const { starteBackupJob } = await import("@/db/backup");
+        starteBackupJob();
+      } catch (e) {
+        console.error("[backup] init:", e);
+      }
+    }
   }
 }
