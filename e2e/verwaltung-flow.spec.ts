@@ -4,7 +4,10 @@ import { expect, test } from "@playwright/test";
 // playwright.config.ts): login → Artikel → Neuer Artikel → open it → Zugang
 // with a new charge → Entnahme → Journal shows the entnahme.
 test("verwaltung happy path: create article, zugang, entnahme, journal", async ({ page }) => {
-  const artikelName = "E2E Verbandpäckchen";
+  // Distinct from the names seeded in e2e/migrate-db.ts so this flow-created
+  // article is unambiguous (the demo DB is no longer empty — later milestones
+  // seed articles for their own specs).
+  const artikelName = "E2E Flow Verband";
 
   await test.step("demo-login reaches the Verwaltung shell", async () => {
     await page.goto("/");
@@ -13,10 +16,9 @@ test("verwaltung happy path: create article, zugang, entnahme, journal", async (
     await expect(page.getByRole("heading", { name: "Übersicht" })).toBeVisible();
   });
 
-  await test.step("Artikel list starts empty", async () => {
+  await test.step("open the Artikel list", async () => {
     await page.getByRole("link", { name: "Artikel" }).click();
     await expect(page.getByRole("heading", { name: "Artikel & Bestand" })).toBeVisible();
-    await expect(page.locator("table.tbl tbody tr")).toHaveCount(0);
   });
 
   await test.step("create a new article", async () => {
@@ -29,7 +31,6 @@ test("verwaltung happy path: create article, zugang, entnahme, journal", async (
     await drawer.locator("div.grid2 input").fill("E2E");
     await drawer.getByRole("button", { name: "Artikel anlegen" }).click();
     await expect(drawer).toBeHidden();
-    await expect(page.locator("table.tbl tbody tr")).toHaveCount(1);
     await expect(page.getByRole("cell", { name: artikelName })).toBeVisible();
   });
 
