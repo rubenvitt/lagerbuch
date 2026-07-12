@@ -11,6 +11,7 @@ import { bestand } from "@/lib/domain/bestand";
 import { ensureHandlager } from "@/db/seed-handlager";
 import { bucheZugang, bucheEntnahme } from "./buchung";
 import { bucheEntnahmeHelfer } from "./buchung";
+import { fefoAbbuchung } from "@/db/abbuchung";
 
 function seedArtikel(db = createTestDb()) {
   // The FK on buchungen.lagerortId requires the Handlager lagerort to exist;
@@ -120,4 +121,19 @@ it("normale Entnahme setzt referenz=null", async () => {
   const entn = db.select().from(buchungen).where(eq(buchungen.typ, "entnahme")).all();
   expect(entn.length).toBeGreaterThan(0);
   expect(entn.every((b) => b.referenz === null)).toBe(true);
+});
+
+describe("fefoAbbuchung typ", () => {
+  it("schreibt korrektur-Zeilen wenn typ=korrektur", async () => {
+    const { db, id } = seedArtikel();
+    await bucheZugang({ artikelId: id, menge: 5, neueCharge: { chargenNr: "K", verfall: "2028-01" } }, db);
+    db.transaction((tx) => {
+      const g = fefoAbbuchung(tx, { artikelId: id, menge: 2, quelle: { quelleTyp: "oidc", quelleId: "u1" }, kommentar: "inv", referenz: "inventur:x", typ: "korrektur" });
+      expect(g).toBe(2);
+    });
+    const korr = db.select().from(buchungen).where(eq(buchungen.typ, "korrektur")).all();
+    expect(korr).toHaveLength(1);
+    expect(korr[0].menge).toBe(-2);
+    expect(korr[0].referenz).toBe("inventur:x");
+  });
 });

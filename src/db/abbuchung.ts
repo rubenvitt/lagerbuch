@@ -16,9 +16,9 @@ export type Quelle = { quelleTyp: "oidc" | "token"; quelleId: string };
 // tatsaechlich gebuchte Menge zurueck. Geteilt von Entnahme-Wrappern UND checkAbschluss.
 export function fefoAbbuchung(
   tx: Tx,
-  args: { artikelId: string; menge: number; quelle: Quelle; kommentar: string | null; referenz: string | null },
+  args: { artikelId: string; menge: number; quelle: Quelle; kommentar: string | null; referenz: string | null; typ?: "entnahme" | "korrektur" },
 ): number {
-  const { artikelId, menge, quelle, kommentar, referenz } = args;
+  const { artikelId, menge, quelle, kommentar, referenz, typ = "entnahme" } = args;
   const chs = tx.select().from(chargen).where(eq(chargen.artikelId, artikelId)).all();
   const bu = tx.select().from(buchungen).where(eq(buchungen.artikelId, artikelId)).all();
   const rest = bestandProCharge(bu.map((b) => ({ chargeId: b.chargeId, menge: b.menge })));
@@ -26,7 +26,7 @@ export function fefoAbbuchung(
   let gebucht = 0;
   for (const teil of fefoVerteilung(chargenRest, menge)) {
     tx.insert(buchungen).values({
-      id: newId(), ts: new Date(), typ: "entnahme", artikelId, chargeId: teil.chargeId,
+      id: newId(), ts: new Date(), typ, artikelId, chargeId: teil.chargeId,
       lagerortId: HANDLAGER_ID, menge: -teil.menge, quelleTyp: quelle.quelleTyp, quelleId: quelle.quelleId,
       referenz, kommentar,
     }).run();
