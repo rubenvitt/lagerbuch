@@ -4,7 +4,7 @@ import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks 
 import { bestand, bestandProCharge } from "@/lib/domain/bestand";
 import { verfallStatus } from "@/lib/domain/verfall";
 import type { Ampel } from "@/lib/domain/verfall";
-import { braucht } from "@/lib/domain/vorschlag";
+import { braucht, vorschlagsmenge } from "@/lib/domain/vorschlag";
 import { config } from "@/lib/config";
 import { chargeText } from "@/lib/format";
 
@@ -193,6 +193,18 @@ export function checkHistorie(db: DB, limit = 50) {
     } catch { /* ergebnis unlesbar → 0 */ }
     return { id: c.id, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, fehlPositionen, gebuchtGesamt };
   });
+}
+
+export type BestellZeile = { id: string; name: string; einheit: string; fach: string; bestand: number; mindestbestand: number; vorschlag: number; bestellt: boolean };
+
+export function bestellvorschlag(db: DB): BestellZeile[] {
+  const allBu = db.select().from(buchungen).all();
+  return db.select().from(artikel).where(eq(artikel.aktiv, true)).all()
+    .map((a) => {
+      const b = bestand(allBu.filter((x) => x.artikelId === a.id).map((x) => ({ menge: x.menge })));
+      return { id: a.id, name: a.name, einheit: a.einheit, fach: a.fach, bestand: b, mindestbestand: a.mindestbestand, vorschlag: vorschlagsmenge(b, a.mindestbestand, config.bestellFaktor), bestellt: Boolean(a.bestelltAt) };
+    })
+    .filter((z) => braucht(z.bestand, z.mindestbestand));
 }
 
 export function tokenListe(db: DB) {
