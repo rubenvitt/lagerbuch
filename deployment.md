@@ -27,7 +27,7 @@ mit `denied`/`not found` fehl.
 | Variable | Zweck |
 |---|---|
 | `IMAGE_TAG` | `edge` (Staging) oder `vX.Y.Z` (Prod) |
-| `APP_BASE_URL` | öffentliche URL (OIDC-Callbacks, QR-Deep-Links) |
+| `APP_BASE_URL` | öffentliche URL (QR-Deep-Links; compose setzt daraus `AUTH_URL` für die OIDC-`redirect_uri`) |
 | `APP_ORG` / `APP_NAME` / `APP_TAGLINE` | Branding |
 | `HOST_PORT` | Host-Port → Container-Port 3000 |
 | `AUTH_SECRET` / `HELFER_SESSION_SECRET` | Session-Signatur |
@@ -48,7 +48,14 @@ Der Container hat zusätzlich einen eingebauten HEALTHCHECK
 
 ## Reverse-Proxy (durch Betreiber)
 Leite `https://<deine-domain>` → `http://<host>:<HOST_PORT>` weiter.
-`APP_BASE_URL` muss exakt der öffentlichen URL entsprechen.
+`APP_BASE_URL` muss exakt der öffentlichen URL entsprechen (compose leitet daraus
+`AUTH_URL` ab). Ohne korrektes `AUTH_URL` baut Auth.js die OIDC-`redirect_uri` aus
+den Request-Headern und landet hinter dem Proxy auf `https://0.0.0.0:3000/...`
+→ „redirect_uri not registered".
+
+- **OIDC-Callback beim Pocket-ID-Client registrieren:**
+  `${APP_BASE_URL}/api/auth/callback/oidc` (exakt diese URL, sonst weist der
+  Provider die Anmeldung ab).
 
 - Der Reverse-Proxy **muss `X-Forwarded-For`** an den Container weiterreichen
   und dabei die **echte Client-IP als letzten Eintrag anhängen** (nginx

@@ -9,6 +9,11 @@ services:
       - APP_ORG=${APP_ORG:-}
       - APP_TAGLINE=${APP_TAGLINE:-Materialverwaltung}
       - APP_BASE_URL=${APP_BASE_URL}
+      # Auth.js baut die OIDC-redirect_uri aus AUTH_URL. Ohne diese Variable leitet es
+      # (trustHost:true) die URL aus den Request-Headern ab und landet hinter dem Proxy
+      # auf der Container-Bind-Adresse 0.0.0.0:3000 → "redirect_uri not registered".
+      # Muss die öffentliche URL sein (= APP_BASE_URL).
+      - AUTH_URL=${APP_BASE_URL}
       - DATABASE_PATH=/data/lagerbuch.db
       - AUTH_SECRET=${AUTH_SECRET}
       - HELFER_SESSION_SECRET=${HELFER_SESSION_SECRET}
