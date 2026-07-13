@@ -1,14 +1,14 @@
+import Link from "next/link";
+import { ChevronRight, AlertTriangle } from "lucide-react";
 import { getDb } from "@/db";
-import { fahrzeugListe, sollFuerFahrzeug, artikelListe } from "@/db/queries";
+import { fahrzeugUebersicht } from "@/db/queries";
+import { fmtTs } from "@/lib/format";
 import { NeuFahrzeug } from "./NeuFahrzeug";
-import { SollEditor } from "./SollEditor";
 
 export const dynamic = "force-dynamic";
 
 export default function FahrzeugePage() {
-  const db = getDb();
-  const fahrzeuge = fahrzeugListe(db);
-  const artikel = artikelListe(db).map((a) => ({ id: a.id, name: a.name, fach: a.fach, einheit: a.einheit }));
+  const fahrzeuge = fahrzeugUebersicht(getDb());
   return (
     <>
       <div className="mainhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -16,12 +16,33 @@ export default function FahrzeugePage() {
         <NeuFahrzeug />
       </div>
       {fahrzeuge.length === 0 && <div className="card cardpad">Noch keine Fahrzeuge. Lege oben das erste an.</div>}
-      {fahrzeuge.map((f) => (
-        <section key={f.id} style={{ marginTop: 12 }}>
-          <div className="cardtitle">{f.name}{f.kennung ? ` · ${f.kennung}` : ""}</div>
-          <SollEditor fahrzeugId={f.id} positionen={sollFuerFahrzeug(db, f.id)} artikel={artikel} />
-        </section>
-      ))}
+      {fahrzeuge.length > 0 && (
+        <div className="card">
+          {fahrzeuge.map((f) => (
+            <Link className="row" key={f.id} href={`/verwaltung/fahrzeuge/${f.id}`}>
+              <div className="rowmain">
+                <div className="rowname">
+                  {f.name}
+                  {f.kennung ? <span className="mono" style={{ marginLeft: 8, color: "var(--stahl)" }}>{f.kennung}</span> : null}
+                </div>
+                <div className="rowmeta">
+                  {!f.aktiv && <span className="chip chip-grau">inaktiv</span>}
+                  <small>
+                    {f.positionen} Position{f.positionen === 1 ? "" : "en"}
+                    {f.faecher > 0 ? ` · ${f.faecher} ${f.faecher === 1 ? "Fach" : "Fächer"}` : ""}
+                  </small>
+                  {f.artikelUnterSoll > 0 && (
+                    <span className="chip chip-rot"><AlertTriangle size={11} /> {f.artikelUnterSoll} unter Soll</span>
+                  )}
+                  {f.positionen > 0 && f.artikelUnterSoll === 0 && <span className="chip chip-ok">auf Soll</span>}
+                  <small>· {f.letzterCheck ? `zuletzt geprüft ${fmtTs(f.letzterCheck)}` : "noch nie geprüft"}</small>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--stahl)", flex: "none" }} />
+            </Link>
+          ))}
+        </div>
+      )}
     </>
   );
 }

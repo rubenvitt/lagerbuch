@@ -151,6 +151,8 @@ input, select { font: inherit; }
 .sitem.on{background:rgba(255,255,255,.08);color:#fff;border-left-color:var(--rot)}
 .sitem .cnt{margin-left:auto;background:var(--rot);color:#fff;font-size:10.5px;font-weight:700;border-radius:99px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 5px}
 .main{flex:1;min-width:0;padding:24px 26px 60px;overflow-y:auto;height:100vh}
+.backlink{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--stahl);margin-bottom:10px}
+.backlink:hover{color:var(--tinte)}
 .mainhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 .mainhead h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.04em}
 .mainhead p{width:100%;font-size:13px;color:var(--stahl);margin-top:-6px}
