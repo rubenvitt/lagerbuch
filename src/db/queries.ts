@@ -345,7 +345,7 @@ export function bestellvorschlag(db: DB): BestellZeile[] {
     .map((a) => {
       // Bestellvorschlag basiert auf dem HANDLAGER-Bestand (Nachschub ins Zentrallager).
       const b = bestandProLagerort(allBu.filter((x) => x.artikelId === a.id).map((x) => ({ lagerortId: x.lagerortId, menge: x.menge })), HANDLAGER_ID);
-      return { id: a.id, name: a.name, einheit: a.einheit, fach: a.fach, bestand: b, mindestbestand: a.mindestbestand, vorschlag: vorschlagsmenge(b, a.mindestbestand, config.bestellFaktor), bestellt: Boolean(a.bestelltAt) };
+      return { id: a.id, name: a.name, einheit: a.einheit, fach: a.fach, bestand: b, mindestbestand: a.mindestbestand, vorschlag: vorschlagsmenge(b, a.mindestbestand), bestellt: Boolean(a.bestelltAt) };
     })
     .filter((z) => braucht(z.bestand, z.mindestbestand));
 }

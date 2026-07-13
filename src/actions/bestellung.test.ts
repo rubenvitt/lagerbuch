@@ -13,7 +13,7 @@ function seed() {
   const db = createTestDb();
   const now = new Date();
   const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
-  // unter Mindest: bestand 2 < min 8 → vorschlag = 2*8-2 = 14
+  // unter Mindest: bestand 2 < min 8 → vorschlag = 8-2 = 6 (nur bis Soll auffüllen)
   const a = newId(); db.insert(artikel).values({ id: a, name: "NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 8, createdAt: now }).run();
   const c = newId(); db.insert(chargen).values({ id: c, artikelId: a, chargenNr: "C", verfall: "2028-01", createdAt: now }).run();
   db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a, chargeId: c, lagerortId: lo, menge: 2, quelleTyp: "oidc", quelleId: "u1" }).run();
@@ -30,7 +30,7 @@ describe("bestellvorschlag + markiereBestellt", () => {
     const list = bestellvorschlag(db);
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(a);
-    expect(list[0].vorschlag).toBe(14);
+    expect(list[0].vorschlag).toBe(6);
     expect(list[0].bestellt).toBe(false);
   });
   it("markiereBestellt setzt und löscht bestelltAt (bestellt-Flag)", async () => {
