@@ -74,6 +74,12 @@ export const tokens = sqliteTable("tokens", {
   code: text("code").notNull().unique(),
   label: text("label").notNull(),
   scopeLagerortId: text("scope_lagerort_id").references(() => lagerorte.id), // null = Handlager
+  // Ziel des Codes: worauf der eingelöste Code direkt führt. "fahrzeug" → zielId ist eine
+  // lagerorte.id (typ fahrzeug) → Fahrzeug-Check; "artikel" → zielId ist eine artikel.id →
+  // Material-Detail im Handlager. null = allgemeiner Zugang (Artikel-Liste). Bewusst polymorph
+  // (kein FK), da zielId je nach zielTyp auf verschiedene Tabellen zeigt.
+  zielTyp: text("ziel_typ", { enum: ["fahrzeug", "artikel"] }),
+  zielId: text("ziel_id"),
   aktiv: integer("aktiv", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   createdBy: text("created_by").notNull(),

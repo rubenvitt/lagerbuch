@@ -24,8 +24,9 @@ function Schritte({ phase }: { phase: "zaehlen" | "nachfuellen" }) {
   );
 }
 
-export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Record<string, Pos[]> }) {
-  const [vehId, setVehId] = useState<string | null>(fahrzeuge.length === 1 ? fahrzeuge[0].id : null);
+export function CheckFlow({ fahrzeuge, soll, preselect }: { fahrzeuge: Fahrzeug[]; soll: Record<string, Pos[]>; preselect?: string | null }) {
+  // Ein Code mit Fahrzeug-Ziel wählt das Fahrzeug direkt vor; sonst wie gehabt (nur eins → direkt).
+  const [vehId, setVehId] = useState<string | null>(preselect ?? (fahrzeuge.length === 1 ? fahrzeuge[0].id : null));
   const [phase, setPhase] = useState<"zaehlen" | "nachfuellen">("zaehlen");
   const [ist, setIst] = useState<Record<string, number>>({});
   const [nachfuell, setNachfuell] = useState<Record<string, number>>({});

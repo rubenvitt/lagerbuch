@@ -11,7 +11,7 @@ export default function FahrzeugePage() {
   const fahrzeuge = fahrzeugUebersicht(getDb());
   return (
     <>
-      <div className="mainhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="mainhead">
         <h1>Fahrzeuge</h1>
         <NeuFahrzeug />
       </div>
