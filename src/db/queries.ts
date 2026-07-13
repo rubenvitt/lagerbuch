@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
 import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks } from "@/db/schema";
-import { bestand, bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
+import { bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { verfallStatus } from "@/lib/domain/verfall";
 import type { Ampel } from "@/lib/domain/verfall";
@@ -176,6 +176,48 @@ export function fahrzeugListe(db: DB) {
     .map((f) => ({ id: f.id, name: f.name, kennung: f.kennung, aktiv: f.aktiv }));
 }
 
+export type FahrzeugUebersichtZeile = {
+  id: string; name: string; kennung: string | null; aktiv: boolean;
+  positionen: number; // Anzahl Soll-Positionen
+  faecher: number; // Anzahl unterschiedlicher Fächer
+  artikelUnterSoll: number; // Artikel, deren Fahrzeugbestand die Soll-Summe unterschreitet
+  letzterCheck: Date | null; // completedAt des jüngsten Checks
+};
+
+// Verdichtete Übersicht für die Fahrzeugliste: pro Fahrzeug nur Kennzahlen (kein Soll-Editor),
+// damit die Seite bei vielen Fahrzeugen scanbar bleibt. Details/Bearbeiten liegen auf /[id].
+export function fahrzeugUebersicht(db: DB): FahrzeugUebersichtZeile[] {
+  const fahrzeuge = db.select().from(lagerorte).where(eq(lagerorte.typ, "fahrzeug")).all();
+  const allBu = db.select().from(buchungen).all();
+  const allSoll = db.select().from(sollPositionen).all();
+  const letzterProFzg = new Map<string, Date>();
+  for (const c of db.select().from(checks).all()) {
+    if (!c.completedAt) continue;
+    const prev = letzterProFzg.get(c.fahrzeugId);
+    if (!prev || c.completedAt > prev) letzterProFzg.set(c.fahrzeugId, c.completedAt);
+  }
+  return fahrzeuge
+    .map((f) => {
+      const soll = allSoll.filter((s) => s.fahrzeugId === f.id);
+      const faecher = new Set(soll.map((s) => s.fachLabel));
+      // Soll je Artikel summieren (derselbe Artikel kann in mehreren Fächern liegen, teilt aber
+      // EINEN Fahrzeugbestand), dann gegen den recorded Fahrzeugbestand vergleichen.
+      const sollProArtikel = new Map<string, number>();
+      for (const s of soll) sollProArtikel.set(s.artikelId, (sollProArtikel.get(s.artikelId) ?? 0) + s.soll);
+      let artikelUnterSoll = 0;
+      for (const [artikelId, sollSumme] of sollProArtikel) {
+        const bu = allBu.filter((b) => b.artikelId === artikelId).map((b) => ({ lagerortId: b.lagerortId, menge: b.menge }));
+        if (bestandProLagerort(bu, f.id) < sollSumme) artikelUnterSoll++;
+      }
+      return {
+        id: f.id, name: f.name, kennung: f.kennung, aktiv: f.aktiv,
+        positionen: soll.length, faecher: faecher.size, artikelUnterSoll,
+        letzterCheck: letzterProFzg.get(f.id) ?? null,
+      };
+    })
+    .sort((a, b) => Number(b.aktiv) - Number(a.aktiv) || a.name.localeCompare(b.name));
+}
+
 export type SollZeile = {
   id: string; fachLabel: string; sort: number; artikelId: string; artikelName: string; einheit: string;
   handlagerFach: string; soll: number;
@@ -204,22 +246,95 @@ export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
 export function checkHistorie(db: DB, limit = 50) {
   const namen = new Map(db.select().from(lagerorte).all().map((l) => [l.id, l.name]));
   return db.select().from(checks).orderBy(desc(checks.completedAt)).limit(limit).all().map((c) => {
-    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0;
+    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0, offenGesamt = 0;
     try {
       const raw = JSON.parse(c.ergebnis ?? "[]");
       if (Array.isArray(raw)) {
         // ALTES Format (vor Fahrzeugbestand): Array pro Position {fehlt, gebucht}.
         positionen = raw.length;
         nachgefuelltGesamt = raw.reduce((s: number, e: { gebucht?: number }) => s + (e.gebucht ?? 0), 0);
+        offenGesamt = raw.reduce((s: number, e: { fehlt?: number; gebucht?: number }) => s + Math.max(0, (e.fehlt ?? 0) - (e.gebucht ?? 0)), 0);
       } else {
         // NEUES Format: {positionen:[…], artikel:[{korrektur, nachfuellGebucht}]}.
         positionen = (raw.positionen ?? []).length;
         nachgefuelltGesamt = (raw.artikel ?? []).reduce((s: number, a: { nachfuellGebucht?: number }) => s + (a.nachfuellGebucht ?? 0), 0);
         korrigiertGesamt = (raw.artikel ?? []).reduce((s: number, a: { korrektur?: number }) => s + Math.abs(a.korrektur ?? 0), 0);
+        // Nach dem Check noch fehlend: Soll − gezählt − nachgefüllt (z. B. Handlager war leer).
+        offenGesamt = (raw.artikel ?? []).reduce((s: number, a: { sollSumme?: number; istSumme?: number; nachfuellGebucht?: number }) => s + Math.max(0, (a.sollSumme ?? 0) - (a.istSumme ?? 0) - (a.nachfuellGebucht ?? 0)), 0);
       }
     } catch { /* ergebnis unlesbar → 0 */ }
-    return { id: c.id, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt };
+    return { id: c.id, fahrzeugId: c.fahrzeugId, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt, offenGesamt };
   });
+}
+
+export type CheckPositionDetail = {
+  fachLabel: string; artikelId: string; artikelName: string; einheit: string; soll: number; ist: number;
+};
+export type CheckArtikelDetail = {
+  artikelId: string; artikelName: string; einheit: string;
+  sollSumme: number; istSumme: number; recordedVorher: number; korrektur: number; nachfuellGebucht: number;
+  offen: number; // nach dem Check noch fehlend: max(0, Soll − gezählt − nachgefüllt)
+};
+export type CheckDetail = {
+  id: string; fahrzeugId: string; fahrzeugName: string; fahrzeugKennung: string | null;
+  quelleId: string; startedAt: Date; completedAt: Date | null;
+  positionen: CheckPositionDetail[]; artikel: CheckArtikelDetail[];
+  altFormat: boolean; // altes ergebnis-Format ohne Positionsdetails
+  summe: { positionen: number; nachgefuellt: number; korrigiert: number; offen: number };
+};
+
+// Detailansicht EINES abgeschlossenen Fahrzeug-Checks. Das ergebnis-JSON wird angereichert um
+// Fach-/Artikelnamen (best effort — inzwischen gelöschte Soll-Positionen/Artikel werden tolerant
+// überbrückt). Das ALTE ergebnis-Format (Array) trug keine Positionsdetails → altFormat=true.
+export function checkDetail(db: DB, id: string): CheckDetail | null {
+  const c = db.select().from(checks).where(eq(checks.id, id)).get();
+  if (!c) return null;
+  const fahrzeug = db.select().from(lagerorte).where(eq(lagerorte.id, c.fahrzeugId)).get();
+  const arts = new Map(db.select().from(artikel).all().map((a) => [a.id, a]));
+  const sollRows = new Map(db.select().from(sollPositionen).all().map((s) => [s.id, s]));
+
+  let positionen: CheckPositionDetail[] = [];
+  let artikelD: CheckArtikelDetail[] = [];
+  let altFormat = false;
+  try {
+    const raw = JSON.parse(c.ergebnis ?? "[]");
+    if (Array.isArray(raw)) {
+      altFormat = true; // altes Format (vor Fahrzeugbestand) ohne Soll/Ist je Position
+    } else {
+      positionen = (raw.positionen ?? []).map((p: { sollPositionId?: string; artikelId: string; soll?: number; ist?: number }) => {
+        const a = arts.get(p.artikelId);
+        const s = p.sollPositionId ? sollRows.get(p.sollPositionId) : undefined;
+        return {
+          fachLabel: s?.fachLabel ?? "–", artikelId: p.artikelId,
+          artikelName: a?.name ?? "(gelöschter Artikel)", einheit: a?.einheit ?? "",
+          soll: p.soll ?? 0, ist: p.ist ?? 0,
+        };
+      });
+      artikelD = (raw.artikel ?? []).map((g: { artikelId: string; sollSumme?: number; istSumme?: number; recordedVorher?: number; korrektur?: number; nachfuellGebucht?: number }) => {
+        const a = arts.get(g.artikelId);
+        const sollSumme = g.sollSumme ?? 0, istSumme = g.istSumme ?? 0, nachfuellGebucht = g.nachfuellGebucht ?? 0;
+        return {
+          artikelId: g.artikelId, artikelName: a?.name ?? "(gelöschter Artikel)", einheit: a?.einheit ?? "",
+          sollSumme, istSumme, recordedVorher: g.recordedVorher ?? 0,
+          korrektur: g.korrektur ?? 0, nachfuellGebucht,
+          offen: Math.max(0, sollSumme - istSumme - nachfuellGebucht),
+        };
+      });
+    }
+  } catch { /* ergebnis unlesbar → leere Detaillisten */ }
+
+  positionen.sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.artikelName.localeCompare(y.artikelName));
+  const nachgefuellt = artikelD.reduce((s, a) => s + a.nachfuellGebucht, 0);
+  const korrigiert = artikelD.reduce((s, a) => s + Math.abs(a.korrektur), 0);
+  const offen = artikelD.reduce((s, a) => s + a.offen, 0);
+
+  return {
+    id: c.id, fahrzeugId: c.fahrzeugId,
+    fahrzeugName: fahrzeug?.name ?? "–", fahrzeugKennung: fahrzeug?.kennung ?? null,
+    quelleId: c.quelleId, startedAt: c.startedAt, completedAt: c.completedAt,
+    positionen, artikel: artikelD, altFormat,
+    summe: { positionen: positionen.length, nachgefuellt, korrigiert, offen },
+  };
 }
 
 export type BestellZeile = { id: string; name: string; einheit: string; fach: string; bestand: number; mindestbestand: number; vorschlag: number; bestellt: boolean };
@@ -230,7 +345,7 @@ export function bestellvorschlag(db: DB): BestellZeile[] {
     .map((a) => {
       // Bestellvorschlag basiert auf dem HANDLAGER-Bestand (Nachschub ins Zentrallager).
       const b = bestandProLagerort(allBu.filter((x) => x.artikelId === a.id).map((x) => ({ lagerortId: x.lagerortId, menge: x.menge })), HANDLAGER_ID);
-      return { id: a.id, name: a.name, einheit: a.einheit, fach: a.fach, bestand: b, mindestbestand: a.mindestbestand, vorschlag: vorschlagsmenge(b, a.mindestbestand, config.bestellFaktor), bestellt: Boolean(a.bestelltAt) };
+      return { id: a.id, name: a.name, einheit: a.einheit, fach: a.fach, bestand: b, mindestbestand: a.mindestbestand, vorschlag: vorschlagsmenge(b, a.mindestbestand), bestellt: Boolean(a.bestelltAt) };
     })
     .filter((z) => braucht(z.bestand, z.mindestbestand));
 }

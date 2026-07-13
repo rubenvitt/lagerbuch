@@ -1,6 +1,6 @@
 "use client";
-import { useMemo, useState, useTransition } from "react";
-import { Check, AlertTriangle, ArrowRight, PackageCheck } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Check, AlertTriangle, ArrowRight, PackageCheck, PackageSearch } from "lucide-react";
 import { Stepper } from "@/components/Stepper";
 import { checkAbschluss } from "@/actions/check";
 
@@ -10,12 +10,26 @@ type Pos = {
 };
 type Fahrzeug = { id: string; name: string; kennung: string | null };
 
+// Zwei-Schritt-Kopf: zeigt jederzeit, wo im Check man steht (Führung & Klarheit).
+function Schritte({ phase }: { phase: "zaehlen" | "nachfuellen" }) {
+  return (
+    <div className="checksteps">
+      <div className={`stp ${phase === "zaehlen" ? "on" : "done"}`}>
+        <span className="no">{phase === "zaehlen" ? "1" : <Check size={13} />}</span> Zählen
+      </div>
+      <div className={`stp ${phase === "nachfuellen" ? "on" : ""}`}>
+        <span className="no">2</span> Nachfüllen
+      </div>
+    </div>
+  );
+}
+
 export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Record<string, Pos[]> }) {
   const [vehId, setVehId] = useState<string | null>(fahrzeuge.length === 1 ? fahrzeuge[0].id : null);
   const [phase, setPhase] = useState<"zaehlen" | "nachfuellen">("zaehlen");
   const [ist, setIst] = useState<Record<string, number>>({});
   const [nachfuell, setNachfuell] = useState<Record<string, number>>({});
-  const [msg, setMsg] = useState<string | null>(null);
+  const [result, setResult] = useState<{ nachgefuellt: number; offen: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -28,6 +42,7 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
         {fahrzeuge.map((f) => (
           <button className="row" key={f.id} onClick={() => setVehId(f.id)} style={{ width: "100%", textAlign: "left", background: "none", border: 0 }}>
             <div className="rowmain"><div className="rowname">{f.name}</div>{f.kennung && <div className="rowmeta"><small>{f.kennung}</small></div>}</div>
+            <ArrowRight size={17} style={{ color: "var(--stahl)", flex: "none" }} />
           </button>
         ))}
       </div>
@@ -42,15 +57,33 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
   // derselbe Artikel in mehreren Fächern würde sich sonst vervielfachen.
   const istWert = (p: Pos) => ist[p.id] ?? p.soll;
 
-  if (msg) return (
-    <>
-      <div className="card cardpad"><div className="chip chip-ok" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Check size={14} /> {msg}</div></div>
-      <button className="btn btn-ghost" onClick={() => { setMsg(null); setPhase("zaehlen"); setIst({}); setNachfuell({}); setVehId(fahrzeuge.length === 1 ? vehId : null); }}>Weiterer Check</button>
-    </>
-  );
+  if (result) {
+    const alles = result.offen === 0;
+    return (
+      <>
+        <div className="screenhead">{veh.name} · Fertig</div>
+        <div className="card cardpad" style={{ borderLeft: `4px solid var(--${alles ? "ok" : "gelb"})` }}>
+          <div className="rowname" style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 16 }}>
+            <Check size={18} style={{ color: `var(--${alles ? "ok" : "gelb"})` }} /> Check abgeschlossen
+          </div>
+          <div className="rowmeta" style={{ marginTop: 9 }}>
+            <span className="chip chip-ok">{result.nachgefuellt} aus Handlager geholt</span>
+            {result.offen > 0 && <span className="chip chip-rot"><AlertTriangle size={11} /> {result.offen} fehlt weiterhin</span>}
+          </div>
+          {result.offen > 0 && (
+            <small style={{ color: "var(--stahl)", display: "block", marginTop: 8 }}>
+              Das Handlager hatte nicht genug – bitte der Verwaltung melden. {result.offen} Teile fehlen weiterhin auf dem Fahrzeug.
+            </small>
+          )}
+        </div>
+        <button className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => { setResult(null); setPhase("zaehlen"); setIst({}); setNachfuell({}); setVehId(fahrzeuge.length === 1 ? vehId : null); }}>Weiterer Check</button>
+      </>
+    );
+  }
 
   // ——— Schritt 1: Zählen ———
   if (phase === "zaehlen") {
+    const unterSoll = positionen.filter((p) => istWert(p) < p.soll).length;
     const zurNachfuellung = () => {
       // Greedy je Artikel: die Handlager-Verfügbarkeit über die Positionen (Anzeige-Reihenfolge)
       // verteilen, damit der Vorschlag nicht mehr verspricht, als der Handlager hergibt.
@@ -70,7 +103,12 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
     };
     return (
       <>
-        <div className="screenhead">{veh.name}{veh.kennung ? ` · ${veh.kennung}` : ""} · Zählen</div>
+        <div className="screenhead">{veh.name}{veh.kennung ? ` · ${veh.kennung}` : ""}</div>
+        <Schritte phase="zaehlen" />
+        <div className="card cardpad" style={{ marginBottom: 4 }}>
+          <div className="rowname" style={{ fontSize: 14 }}>Wie viel liegt wirklich im Fahrzeug?</div>
+          <small style={{ color: "var(--stahl)" }}>Jede Position ist auf Soll vorbelegt – mit <b>−</b> runterzählen, was fehlt.</small>
+        </div>
         {positionen.length === 0 && <div className="card cardpad">Kein Soll für dieses Fahrzeug definiert.</div>}
         {faecher.map((fach) => (
           <div key={fach}>
@@ -93,7 +131,7 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
                     </div>
                     {/* max großzügig über Soll: echter Überbestand muss zählbar sein, sonst
                         würde der Abgleich real vorhandene Teile still herauskorrigieren. */}
-                    <Stepper sm wert={wert} min={0} max={9999} setWert={(vv) => setIst((s) => ({ ...s, [p.id]: vv }))} />
+                    <Stepper sm noText wert={wert} min={0} max={9999} setWert={(vv) => setIst((s) => ({ ...s, [p.id]: vv }))} />
                   </div>
                 );
               })}
@@ -102,7 +140,10 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
         ))}
         {positionen.length > 0 && (
           <div className="summary">
-            <div className="info"><b>Ist erfasst?</b><div>Weiter zur Nachfüllung aus dem Handlager</div></div>
+            <div className="info">
+              <b>{unterSoll === 0 ? "Alles auf Soll" : `${unterSoll} unter Soll`}</b>
+              <div>{unterSoll === 0 ? "Nichts nachzufüllen" : "Weiter zur Nachfüllung aus dem Handlager"}</div>
+            </div>
             <button className="go" onClick={zurNachfuellung} style={{ display: "flex", alignItems: "center", gap: 6 }}>Weiter <ArrowRight size={16} /></button>
           </div>
         )}
@@ -126,11 +167,11 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
     setErr(null);
     start(async () => {
       try {
-        const { nachgefuellt } = await checkAbschluss({
+        const r = await checkAbschluss({
           fahrzeugId: vehId,
           positionen: positionen.map((p) => ({ sollPositionId: p.id, ist: istWert(p), nachfuellMenge: nfWert(p) })),
         });
-        setMsg(`Check abgeschlossen – ${nachgefuellt} Teile aus dem Handlager aufs Fahrzeug gelegt`);
+        setResult({ nachgefuellt: r.nachgefuellt, offen: r.offen });
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Fehler beim Abschließen – bitte erneut versuchen");
       }
@@ -139,28 +180,41 @@ export function CheckFlow({ fahrzeuge, soll }: { fahrzeuge: Fahrzeug[]; soll: Re
 
   return (
     <>
-      <div className="screenhead">{veh.name} · Nachfüllen</div>
+      <div className="screenhead">{veh.name}</div>
+      <Schritte phase="nachfuellen" />
       <button className="btn btn-ghost" onClick={() => setPhase("zaehlen")} style={{ marginBottom: 10 }}>← Zurück zum Zählen</button>
       {nachfuellPositionen.length === 0 ? (
         <div className="card cardpad">Nichts nachzufüllen – alle Positionen sind auf Soll. Du kannst den Check direkt abschließen.</div>
       ) : (
-        <div className="card">
-          <div className="cardtitle">Aus dem Handlager aufs Fahrzeug legen</div>
-          {nachfuellPositionen.map((p) => {
-            const luecke = Math.max(0, p.soll - istWert(p));
-            return (
-              <div className="row" key={p.id}>
-                <div className="rowmain">
-                  <div className="rowname">{p.artikelName}</div>
-                  <div className="rowmeta">
-                    <small>Fach {p.handlagerFach} · Lücke {luecke} · Handlager {p.handlagerBestand}</small>
+        <>
+          <div className="card cardpad" style={{ marginBottom: 4, display: "flex", gap: 9, alignItems: "flex-start" }}>
+            <PackageSearch size={18} style={{ color: "var(--rot)", flex: "none", marginTop: 1 }} />
+            <div>
+              <div className="rowname" style={{ fontSize: 14 }}>Aus dem Handlager aufs Fahrzeug legen</div>
+              <small style={{ color: "var(--stahl)" }}>Hol die Teile aus dem angegebenen Handlager-Fach und stell mit <b>+/−</b> ein, wie viele du <b>wirklich</b> geholt hast.</small>
+            </div>
+          </div>
+          <div className="card">
+            {nachfuellPositionen.map((p) => {
+              const luecke = Math.max(0, p.soll - istWert(p));
+              return (
+                <div className="nfitem" key={p.id}>
+                  <div className="rowmain">
+                    <div className="rowname">{p.artikelName}</div>
+                    <div className="rowmeta">
+                      <span className="fach">{p.handlagerFach}</span>
+                      <small>Lücke {luecke} · im Handlager {p.handlagerBestand}</small>
+                    </div>
+                  </div>
+                  <div className="nfget">
+                    <Stepper sm noText wert={nfWert(p)} min={0} max={luecke} setWert={(vv) => setNachfuell((s) => ({ ...s, [p.id]: vv }))} />
+                    <small>geholt</small>
                   </div>
                 </div>
-                <Stepper sm wert={nfWert(p)} min={0} max={luecke} setWert={(vv) => setNachfuell((s) => ({ ...s, [p.id]: vv }))} />
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
       {[...knappheit.entries()].filter(([, e]) => e.gewuenscht > e.verfuegbar).length > 0 && (
         <div className="card cardpad">

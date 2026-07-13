@@ -1,0 +1,69 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ChevronRight } from "lucide-react";
+import { getDb } from "@/db";
+import { fahrzeugListe, sollFuerFahrzeug, artikelListe, checkHistorie } from "@/db/queries";
+import { fmtTs } from "@/lib/format";
+import { SollEditor } from "../SollEditor";
+import { FahrzeugAktivToggle } from "./FahrzeugAktivToggle";
+
+export const dynamic = "force-dynamic";
+
+export default async function FahrzeugDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const db = getDb();
+  const fahrzeug = fahrzeugListe(db).find((f) => f.id === id);
+  if (!fahrzeug) notFound();
+
+  const positionen = sollFuerFahrzeug(db, id);
+  const artikel = artikelListe(db).map((a) => ({ id: a.id, name: a.name, fach: a.fach, einheit: a.einheit }));
+  const faecher = new Set(positionen.map((p) => p.fachLabel)).size;
+  const unterSoll = positionen.filter((p) => p.fahrzeugBestand < p.soll).length;
+  const checks = checkHistorie(db).filter((c) => c.fahrzeugId === id).slice(0, 8);
+
+  return (
+    <>
+      <Link className="backlink" href="/verwaltung/fahrzeuge"><ArrowLeft size={15} /> Fahrzeuge</Link>
+      <div className="mainhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1>
+          {fahrzeug.name}
+          {fahrzeug.kennung ? <span className="mono" style={{ marginLeft: 10, color: "var(--stahl)", fontSize: 15 }}>{fahrzeug.kennung}</span> : null}
+        </h1>
+        <FahrzeugAktivToggle id={fahrzeug.id} aktiv={fahrzeug.aktiv} />
+      </div>
+
+      <div className="kpis">
+        <div className="kpi"><b>{positionen.length}</b><div>Soll-Positionen</div></div>
+        <div className="kpi"><b>{faecher}</b><div>Fächer</div></div>
+        <div className={`kpi ${unterSoll ? "rot" : "ok"}`}><b>{unterSoll}</b><div>Positionen unter Soll</div></div>
+        <div className={`kpi ${fahrzeug.aktiv ? "ok" : "gelb"}`}><b>{fahrzeug.aktiv ? "aktiv" : "inaktiv"}</b><div>Status</div></div>
+      </div>
+
+      <div className="cardtitle" style={{ padding: "6px 2px 8px" }}>Soll-Bestückung</div>
+      <SollEditor fahrzeugId={fahrzeug.id} positionen={positionen} artikel={artikel} />
+
+      <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Letzte Checks</div>
+      {checks.length === 0 ? (
+        <div className="card cardpad">Für dieses Fahrzeug wurde noch kein Check durchgeführt.</div>
+      ) : (
+        <div className="card">
+          {checks.map((c) => (
+            <Link className="row" key={c.id} href={`/verwaltung/checks/${c.id}`}>
+              <div className="rowmain">
+                <div className="rowname">{c.completedAt ? fmtTs(c.completedAt) : "–"}</div>
+                <div className="rowmeta">
+                  {c.nachgefuelltGesamt > 0 && <span className="chip chip-rot">{c.nachgefuelltGesamt} nachgefüllt</span>}
+                  {c.korrigiertGesamt > 0 && <span className="chip chip-gelb">{c.korrigiertGesamt} korrigiert</span>}
+                  {c.offenGesamt > 0 && <span className="chip chip-rot">{c.offenGesamt} fehlt</span>}
+                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && <span className="chip chip-ok">vollständig</span>}
+                  <small>{c.positionen} Positionen</small>
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--stahl)", flex: "none" }} />
+            </Link>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}

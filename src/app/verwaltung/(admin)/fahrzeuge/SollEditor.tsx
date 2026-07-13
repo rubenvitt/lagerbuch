@@ -9,14 +9,24 @@ type Artikel = { id: string; name: string; fach: string; einheit: string };
 export function SollEditor({ fahrzeugId, positionen, artikel }: { fahrzeugId: string; positionen: SollZeile[]; artikel: Artikel[] }) {
   const [pending, start] = useTransition();
   const [fach, setFach] = useState("");
+  const [neuFach, setNeuFach] = useState(false); // Modus: neues Fach per Freitext anlegen
   const [artikelId, setArtikelId] = useState("");
   const [soll, setSoll] = useState(1);
 
   const faecher = [...new Set(positionen.map((p) => p.fachLabel))];
+  // Freitext nur im Neuanlage-Modus oder wenn es noch gar kein Fach gibt – sonst wird gewählt.
+  const freitext = neuFach || faecher.length === 0;
 
   function add() {
     if (!fach.trim() || !artikelId || soll < 1) return;
-    start(async () => { await sollPositionSetzen({ fahrzeugId, fachLabel: fach.trim(), artikelId, soll }); setArtikelId(""); setSoll(1); });
+    start(async () => {
+      await sollPositionSetzen({ fahrzeugId, fachLabel: fach.trim(), artikelId, soll });
+      // Fach bewusst gesetzt lassen (mehrere Artikel bequem ins selbe Fach legen); nach dem
+      // Speichern existiert es als Option, daher raus aus dem Neuanlage-Modus.
+      setNeuFach(false);
+      setArtikelId("");
+      setSoll(1);
+    });
   }
 
   return (
@@ -39,7 +49,25 @@ export function SollEditor({ fahrzeugId, positionen, artikel }: { fahrzeugId: st
         </div>
       ))}
       <div className="cardpad" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--linie)" }}>
-        <input className="input" placeholder="Fach, z. B. Schrank 1" value={fach} onChange={(e) => setFach(e.target.value)} style={{ minWidth: 150 }} />
+        {freitext ? (
+          <>
+            <input className="input" placeholder="Neues Fach, z. B. Schrank 1" value={fach} autoFocus={neuFach} onChange={(e) => setFach(e.target.value)} style={{ minWidth: 150 }} />
+            {faecher.length > 0 && (
+              <button className="btn btn-ghost slim" style={{ width: "auto", flex: "none" }} onClick={() => { setNeuFach(false); setFach(""); }}>Abbrechen</button>
+            )}
+          </>
+        ) : (
+          <select
+            className="input"
+            value={fach}
+            onChange={(e) => { if (e.target.value === "__neu__") { setNeuFach(true); setFach(""); } else setFach(e.target.value); }}
+            style={{ minWidth: 150 }}
+          >
+            <option value="">Fach wählen…</option>
+            {faecher.map((f) => <option key={f} value={f}>{f}</option>)}
+            <option value="__neu__">+ Neues Fach…</option>
+          </select>
+        )}
         <select className="input" value={artikelId} onChange={(e) => setArtikelId(e.target.value)}>
           <option value="">Artikel wählen…</option>
           {artikel.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

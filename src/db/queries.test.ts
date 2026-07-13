@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTestDb } from "@/db/testing";
-import { artikel, chargen, buchungen, lagerorte, newId } from "@/db/schema";
+import { artikel, chargen, buchungen, lagerorte, sollPositionen, checks, newId } from "@/db/schema";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { artikelListe, artikelDetail, artikelDetailHelfer, journalEintraege, kennzahlen } from "./queries";
-import { verfallListe } from "./queries";
+import { verfallListe, fahrzeugUebersicht, checkDetail, checkHistorie } from "./queries";
 
 function seed() {
   const db = createTestDb();
@@ -119,6 +119,132 @@ describe("queries", () => {
     expect(j[0].ts.getTime()).toBe(newer.getTime());
     expect(j[0].kommentar).toBe("neu");
     expect(j[1].ts.getTime()).toBe(older.getTime());
+  });
+});
+
+describe("fahrzeugUebersicht", () => {
+  it("verdichtet Positionen/Fächer, zählt Artikel unter Soll und den jüngsten Check", () => {
+    const db = createTestDb();
+    const now = new Date();
+    db.insert(lagerorte).values({ id: HANDLAGER_ID, name: "Handlager", typ: "lager" }).run();
+    const fz = newId();
+    db.insert(lagerorte).values({ id: fz, name: "RTW 1", typ: "fahrzeug", kennung: "XX-RK 1", aktiv: true }).run();
+    const a1 = newId(); db.insert(artikel).values({ id: a1, name: "NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 0, createdAt: now }).run();
+    const a2 = newId(); db.insert(artikel).values({ id: a2, name: "HME", einheit: "Stk.", fach: "A2", mindestbestand: 0, createdAt: now }).run();
+    const c1 = newId(); db.insert(chargen).values({ id: c1, artikelId: a1, chargenNr: "C1", verfall: "2028-01", createdAt: now }).run();
+    // a1: Soll 4 in zwei Fächern (S1+S2), aber nur 2 auf dem Fahrzeug → unter Soll.
+    db.insert(sollPositionen).values({ id: newId(), fahrzeugId: fz, fachLabel: "S1", artikelId: a1, soll: 2, sort: 0 }).run();
+    db.insert(sollPositionen).values({ id: newId(), fahrzeugId: fz, fachLabel: "S2", artikelId: a1, soll: 2, sort: 0 }).run();
+    db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a1, chargeId: c1, lagerortId: fz, menge: 2, quelleTyp: "system", quelleId: "s" }).run();
+    // a2: Soll 1, 1 auf dem Fahrzeug → auf Soll.
+    const c2 = newId(); db.insert(chargen).values({ id: c2, artikelId: a2, chargenNr: "C2", verfall: "2028-01", createdAt: now }).run();
+    db.insert(sollPositionen).values({ id: newId(), fahrzeugId: fz, fachLabel: "S1", artikelId: a2, soll: 1, sort: 0 }).run();
+    db.insert(buchungen).values({ id: newId(), ts: now, typ: "zugang", artikelId: a2, chargeId: c2, lagerortId: fz, menge: 1, quelleTyp: "system", quelleId: "s" }).run();
+
+    const alt = new Date(2020, 0, 1), neu = new Date(2021, 0, 1);
+    db.insert(checks).values({ id: newId(), fahrzeugId: fz, quelleTyp: "token", quelleId: "t", startedAt: alt, completedAt: alt, ergebnis: "{}" }).run();
+    db.insert(checks).values({ id: newId(), fahrzeugId: fz, quelleTyp: "token", quelleId: "t", startedAt: neu, completedAt: neu, ergebnis: "{}" }).run();
+
+    const [row] = fahrzeugUebersicht(db);
+    expect(row.name).toBe("RTW 1");
+    expect(row.positionen).toBe(3);
+    expect(row.faecher).toBe(2); // S1, S2
+    expect(row.artikelUnterSoll).toBe(1); // nur a1
+    expect(row.letzterCheck?.getTime()).toBe(neu.getTime());
+  });
+
+  it("sortiert aktive vor inaktiven Fahrzeugen", () => {
+    const db = createTestDb();
+    db.insert(lagerorte).values({ id: newId(), name: "B-inaktiv", typ: "fahrzeug", aktiv: false }).run();
+    db.insert(lagerorte).values({ id: newId(), name: "A-aktiv", typ: "fahrzeug", aktiv: true }).run();
+    expect(fahrzeugUebersicht(db).map((f) => f.name)).toEqual(["A-aktiv", "B-inaktiv"]);
+  });
+});
+
+describe("checkDetail", () => {
+  it("reichert Positionen/Artikel des neuen ergebnis-Formats mit Namen an und summiert", () => {
+    const db = createTestDb();
+    const now = new Date();
+    const fz = newId(); db.insert(lagerorte).values({ id: fz, name: "RTW 1", typ: "fahrzeug", kennung: "XX-RK 1", aktiv: true }).run();
+    const a = newId(); db.insert(artikel).values({ id: a, name: "NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 0, createdAt: now }).run();
+    const pos = newId(); db.insert(sollPositionen).values({ id: pos, fahrzeugId: fz, fachLabel: "S1", artikelId: a, soll: 4, sort: 0 }).run();
+    const checkId = newId();
+    db.insert(checks).values({
+      id: checkId, fahrzeugId: fz, quelleTyp: "token", quelleId: "111-111", startedAt: now, completedAt: now,
+      ergebnis: JSON.stringify({
+        positionen: [{ sollPositionId: pos, artikelId: a, soll: 4, ist: 1 }],
+        artikel: [{ artikelId: a, positionen: [pos], sollSumme: 4, istSumme: 1, recordedVorher: 0, korrektur: 1, nachfuellGebucht: 3 }],
+      }),
+    }).run();
+
+    const d = checkDetail(db, checkId)!;
+    expect(d.fahrzeugName).toBe("RTW 1");
+    expect(d.fahrzeugKennung).toBe("XX-RK 1");
+    expect(d.positionen).toHaveLength(1);
+    expect(d.positionen[0]).toMatchObject({ fachLabel: "S1", artikelName: "NaCl", soll: 4, ist: 1 });
+    expect(d.artikel[0]).toMatchObject({ artikelName: "NaCl", korrektur: 1, nachfuellGebucht: 3, offen: 0 });
+    expect(d.summe).toMatchObject({ positionen: 1, nachgefuellt: 3, korrigiert: 1, offen: 0 });
+    expect(d.altFormat).toBe(false);
+  });
+
+  it("weist eine nicht (vollständig) aufgefüllte Lücke als offen aus", () => {
+    const db = createTestDb();
+    const now = new Date();
+    const fz = newId(); db.insert(lagerorte).values({ id: fz, name: "RTW 1", typ: "fahrzeug", aktiv: true }).run();
+    const a = newId(); db.insert(artikel).values({ id: a, name: "NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 0, createdAt: now }).run();
+    const pos = newId(); db.insert(sollPositionen).values({ id: pos, fahrzeugId: fz, fachLabel: "S1", artikelId: a, soll: 4, sort: 0 }).run();
+    const checkId = newId();
+    // Soll 4, gezählt 0, aber nur 1 nachgefüllt (Handlager fast leer) → 3 fehlen weiterhin.
+    db.insert(checks).values({
+      id: checkId, fahrzeugId: fz, quelleTyp: "token", quelleId: "t", startedAt: now, completedAt: now,
+      ergebnis: JSON.stringify({
+        positionen: [{ sollPositionId: pos, artikelId: a, soll: 4, ist: 0 }],
+        artikel: [{ artikelId: a, positionen: [pos], sollSumme: 4, istSumme: 0, recordedVorher: 0, korrektur: 0, nachfuellGebucht: 1 }],
+      }),
+    }).run();
+    const d = checkDetail(db, checkId)!;
+    expect(d.artikel[0].offen).toBe(3);
+    expect(d.summe.offen).toBe(3);
+  });
+
+  it("markiert das alte Array-Format als altFormat ohne Positionsdetails", () => {
+    const db = createTestDb();
+    const now = new Date();
+    const fz = newId(); db.insert(lagerorte).values({ id: fz, name: "RTW 1", typ: "fahrzeug", aktiv: true }).run();
+    const checkId = newId();
+    db.insert(checks).values({
+      id: checkId, fahrzeugId: fz, quelleTyp: "token", quelleId: "t", startedAt: now, completedAt: now,
+      ergebnis: JSON.stringify([{ fehlt: 2, gebucht: 2 }]),
+    }).run();
+    const d = checkDetail(db, checkId)!;
+    expect(d.altFormat).toBe(true);
+    expect(d.positionen).toHaveLength(0);
+    expect(d.artikel).toHaveLength(0);
+  });
+
+  it("gibt null für unbekannte id zurück", () => {
+    expect(checkDetail(createTestDb(), "nope")).toBeNull();
+  });
+});
+
+describe("checkHistorie", () => {
+  it("summiert offenGesamt aus nicht aufgefüllten Lücken (neu & altes Format)", () => {
+    const db = createTestDb();
+    const now = new Date();
+    const fz = newId(); db.insert(lagerorte).values({ id: fz, name: "RTW 1", typ: "fahrzeug", aktiv: true }).run();
+    const a = newId(); db.insert(artikel).values({ id: a, name: "NaCl", einheit: "Fl.", fach: "B2", mindestbestand: 0, createdAt: now }).run();
+    // neu: Soll 4, gezählt 0, nachgefüllt 1 → offen 3
+    db.insert(checks).values({
+      id: newId(), fahrzeugId: fz, quelleTyp: "token", quelleId: "t", startedAt: now, completedAt: new Date(2021, 0, 1),
+      ergebnis: JSON.stringify({ positionen: [{ artikelId: a, soll: 4, ist: 0 }], artikel: [{ artikelId: a, sollSumme: 4, istSumme: 0, korrektur: 0, nachfuellGebucht: 1 }] }),
+    }).run();
+    // alt: {fehlt:2, gebucht:0} → offen 2
+    db.insert(checks).values({
+      id: newId(), fahrzeugId: fz, quelleTyp: "token", quelleId: "t", startedAt: now, completedAt: new Date(2020, 0, 1),
+      ergebnis: JSON.stringify([{ fehlt: 2, gebucht: 0 }]),
+    }).run();
+    const hist = checkHistorie(db);
+    expect(hist.map((h) => h.offenGesamt)).toEqual([3, 2]); // neuester zuerst
   });
 });
 
