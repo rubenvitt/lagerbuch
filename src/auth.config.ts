@@ -28,6 +28,12 @@ if (config.oidcIssuer) {
     clientId: config.oidcClientId,
     clientSecret: config.oidcClientSecret,
     authorization: { params: { scope: "openid profile email groups" } },
+    // Auth.js/@auth/core nutzt bei S256-PKCE-fähigen ASsen den Default checks:["pkce"]
+    // und LÄSST state WEG. Pocket ID (Ory Fosite) erzwingt state aber unabhängig von PKCE
+    // (MinParameterEntropy → "invalid_state, must be at least 8 characters"). Deshalb state
+    // explizit erzwingen. Nebeneffekt: der spätere Success-Redirect trägt dann auch iss
+    // (Pocket ID advertised RFC 9207), womit der frühere "iss missing"-Fehler entfällt.
+    checks: ["pkce", "state"],
   });
 }
 
