@@ -22,7 +22,8 @@ export default function ChecksPage() {
                   <span className="jts">{c.completedAt ? fmtTs(c.completedAt) : "–"}</span>
                   {c.nachgefuelltGesamt > 0 && <span className="chip chip-rot">{c.nachgefuelltGesamt} aus Handlager nachgefüllt</span>}
                   {c.korrigiertGesamt > 0 && <span className="chip chip-gelb">{c.korrigiertGesamt} korrigiert</span>}
-                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && <span className="chip chip-ok">vollständig</span>}
+                  {c.offenGesamt > 0 && <span className="chip chip-rot">{c.offenGesamt} fehlt weiterhin</span>}
+                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && <span className="chip chip-ok">vollständig</span>}
                 </div>
               </div>
               <div className="bignum" style={{ fontSize: 18 }}>{c.positionen}<small>Pos.</small></div>

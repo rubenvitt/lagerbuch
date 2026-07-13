@@ -31,7 +31,17 @@ export default async function CheckDetailPage({ params }: { params: Promise<{ id
         <div className="kpi"><b>{check.summe.positionen}</b><div>geprüfte Positionen</div></div>
         <div className={`kpi ${check.summe.nachgefuellt ? "rot" : "ok"}`}><b>{check.summe.nachgefuellt}</b><div>aus Handlager nachgefüllt</div></div>
         <div className={`kpi ${check.summe.korrigiert ? "gelb" : "ok"}`}><b>{check.summe.korrigiert}</b><div>Bestand korrigiert</div></div>
+        <div className={`kpi ${check.summe.offen ? "rot" : "ok"}`}><b>{check.summe.offen}</b><div>fehlt weiterhin</div></div>
       </div>
+
+      {check.summe.offen > 0 && (
+        <div className="card cardpad" style={{ marginBottom: 12, borderLeft: "4px solid var(--rot)" }}>
+          <div className="rowname" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <AlertTriangle size={16} style={{ color: "var(--rot)" }} /> {check.summe.offen} Teile fehlen weiterhin auf dem Fahrzeug
+          </div>
+          <small style={{ color: "var(--stahl)" }}>Nicht (vollständig) aufgefüllt – das Handlager hatte nicht genug oder es wurde nichts nachgelegt.</small>
+        </div>
+      )}
 
       {check.altFormat && (
         <div className="card cardpad" style={{ marginBottom: 12 }}>
@@ -86,7 +96,8 @@ export default async function CheckDetailPage({ params }: { params: Promise<{ id
                       <span className="chip chip-gelb">Bestand {a.korrektur > 0 ? "+" : ""}{a.korrektur}</span>
                     )}
                     {a.nachfuellGebucht > 0 && <span className="chip chip-rot">nachgefüllt {a.nachfuellGebucht}</span>}
-                    {a.korrektur === 0 && a.nachfuellGebucht === 0 && <span className="chip chip-ok">unverändert</span>}
+                    {a.offen > 0 && <span className="chip chip-rot"><AlertTriangle size={11} /> fehlt {a.offen}</span>}
+                    {a.korrektur === 0 && a.nachfuellGebucht === 0 && a.offen === 0 && <span className="chip chip-ok">vollständig</span>}
                   </div>
                 </div>
               </div>

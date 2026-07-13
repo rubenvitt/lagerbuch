@@ -54,7 +54,8 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
                 <div className="rowmeta">
                   {c.nachgefuelltGesamt > 0 && <span className="chip chip-rot">{c.nachgefuelltGesamt} nachgefüllt</span>}
                   {c.korrigiertGesamt > 0 && <span className="chip chip-gelb">{c.korrigiertGesamt} korrigiert</span>}
-                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && <span className="chip chip-ok">vollständig</span>}
+                  {c.offenGesamt > 0 && <span className="chip chip-rot">{c.offenGesamt} fehlt</span>}
+                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && <span className="chip chip-ok">vollständig</span>}
                   <small>{c.positionen} Positionen</small>
                 </div>
               </div>

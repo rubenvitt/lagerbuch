@@ -246,21 +246,24 @@ export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
 export function checkHistorie(db: DB, limit = 50) {
   const namen = new Map(db.select().from(lagerorte).all().map((l) => [l.id, l.name]));
   return db.select().from(checks).orderBy(desc(checks.completedAt)).limit(limit).all().map((c) => {
-    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0;
+    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0, offenGesamt = 0;
     try {
       const raw = JSON.parse(c.ergebnis ?? "[]");
       if (Array.isArray(raw)) {
         // ALTES Format (vor Fahrzeugbestand): Array pro Position {fehlt, gebucht}.
         positionen = raw.length;
         nachgefuelltGesamt = raw.reduce((s: number, e: { gebucht?: number }) => s + (e.gebucht ?? 0), 0);
+        offenGesamt = raw.reduce((s: number, e: { fehlt?: number; gebucht?: number }) => s + Math.max(0, (e.fehlt ?? 0) - (e.gebucht ?? 0)), 0);
       } else {
         // NEUES Format: {positionen:[…], artikel:[{korrektur, nachfuellGebucht}]}.
         positionen = (raw.positionen ?? []).length;
         nachgefuelltGesamt = (raw.artikel ?? []).reduce((s: number, a: { nachfuellGebucht?: number }) => s + (a.nachfuellGebucht ?? 0), 0);
         korrigiertGesamt = (raw.artikel ?? []).reduce((s: number, a: { korrektur?: number }) => s + Math.abs(a.korrektur ?? 0), 0);
+        // Nach dem Check noch fehlend: Soll − gezählt − nachgefüllt (z. B. Handlager war leer).
+        offenGesamt = (raw.artikel ?? []).reduce((s: number, a: { sollSumme?: number; istSumme?: number; nachfuellGebucht?: number }) => s + Math.max(0, (a.sollSumme ?? 0) - (a.istSumme ?? 0) - (a.nachfuellGebucht ?? 0)), 0);
       }
     } catch { /* ergebnis unlesbar → 0 */ }
-    return { id: c.id, fahrzeugId: c.fahrzeugId, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt };
+    return { id: c.id, fahrzeugId: c.fahrzeugId, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt, offenGesamt };
   });
 }
 
@@ -270,13 +273,14 @@ export type CheckPositionDetail = {
 export type CheckArtikelDetail = {
   artikelId: string; artikelName: string; einheit: string;
   sollSumme: number; istSumme: number; recordedVorher: number; korrektur: number; nachfuellGebucht: number;
+  offen: number; // nach dem Check noch fehlend: max(0, Soll − gezählt − nachgefüllt)
 };
 export type CheckDetail = {
   id: string; fahrzeugId: string; fahrzeugName: string; fahrzeugKennung: string | null;
   quelleId: string; startedAt: Date; completedAt: Date | null;
   positionen: CheckPositionDetail[]; artikel: CheckArtikelDetail[];
   altFormat: boolean; // altes ergebnis-Format ohne Positionsdetails
-  summe: { positionen: number; nachgefuellt: number; korrigiert: number };
+  summe: { positionen: number; nachgefuellt: number; korrigiert: number; offen: number };
 };
 
 // Detailansicht EINES abgeschlossenen Fahrzeug-Checks. Das ergebnis-JSON wird angereichert um
@@ -308,10 +312,12 @@ export function checkDetail(db: DB, id: string): CheckDetail | null {
       });
       artikelD = (raw.artikel ?? []).map((g: { artikelId: string; sollSumme?: number; istSumme?: number; recordedVorher?: number; korrektur?: number; nachfuellGebucht?: number }) => {
         const a = arts.get(g.artikelId);
+        const sollSumme = g.sollSumme ?? 0, istSumme = g.istSumme ?? 0, nachfuellGebucht = g.nachfuellGebucht ?? 0;
         return {
           artikelId: g.artikelId, artikelName: a?.name ?? "(gelöschter Artikel)", einheit: a?.einheit ?? "",
-          sollSumme: g.sollSumme ?? 0, istSumme: g.istSumme ?? 0, recordedVorher: g.recordedVorher ?? 0,
-          korrektur: g.korrektur ?? 0, nachfuellGebucht: g.nachfuellGebucht ?? 0,
+          sollSumme, istSumme, recordedVorher: g.recordedVorher ?? 0,
+          korrektur: g.korrektur ?? 0, nachfuellGebucht,
+          offen: Math.max(0, sollSumme - istSumme - nachfuellGebucht),
         };
       });
     }
@@ -320,13 +326,14 @@ export function checkDetail(db: DB, id: string): CheckDetail | null {
   positionen.sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.artikelName.localeCompare(y.artikelName));
   const nachgefuellt = artikelD.reduce((s, a) => s + a.nachfuellGebucht, 0);
   const korrigiert = artikelD.reduce((s, a) => s + Math.abs(a.korrektur), 0);
+  const offen = artikelD.reduce((s, a) => s + a.offen, 0);
 
   return {
     id: c.id, fahrzeugId: c.fahrzeugId,
     fahrzeugName: fahrzeug?.name ?? "–", fahrzeugKennung: fahrzeug?.kennung ?? null,
     quelleId: c.quelleId, startedAt: c.startedAt, completedAt: c.completedAt,
     positionen, artikel: artikelD, altFormat,
-    summe: { positionen: positionen.length, nachgefuellt, korrigiert },
+    summe: { positionen: positionen.length, nachgefuellt, korrigiert, offen },
   };
 }
 
