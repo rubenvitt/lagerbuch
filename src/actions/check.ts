@@ -35,6 +35,7 @@ export async function checkAbschluss(input: z.input<typeof CheckSchema>, db: DB 
   const v = CheckSchema.parse(input);
   const checkId = newId();
   let nachgefuellt = 0; // tatsächlich (nach Handlager-Kappung) umgelagerte Gesamtmenge
+  let offen = 0; // nach dem Check noch fehlend (Soll − gezählt − nachgefüllt), z. B. Handlager leer
   db.transaction((tx) => {
     const sollRows = tx.select().from(sollPositionen).where(eq(sollPositionen.fahrzeugId, v.fahrzeugId)).all();
     const byId = new Map(sollRows.map((s) => [s.id, s]));
@@ -73,6 +74,7 @@ export async function checkAbschluss(input: z.input<typeof CheckSchema>, db: DB 
             }).umgelagert
           : 0;
       nachgefuellt += nachfuellGebucht;
+      offen += Math.max(0, g.sollSumme - g.istSumme - nachfuellGebucht);
       return { artikelId: g.artikelId, positionen: g.positionen, sollSumme: g.sollSumme, istSumme: g.istSumme, recordedVorher, korrektur, nachfuellGewuenscht: g.nachfuellGewuenscht, nachfuellGebucht };
     });
 
@@ -85,5 +87,5 @@ export async function checkAbschluss(input: z.input<typeof CheckSchema>, db: DB 
   revalidatePath("/helfer/check");
   revalidatePath("/verwaltung/checks");
   revalidatePath("/verwaltung");
-  return { checkId, nachgefuellt };
+  return { checkId, nachgefuellt, offen };
 }

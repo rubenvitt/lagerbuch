@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
 import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks } from "@/db/schema";
-import { bestand, bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
+import { bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { verfallStatus } from "@/lib/domain/verfall";
 import type { Ampel } from "@/lib/domain/verfall";

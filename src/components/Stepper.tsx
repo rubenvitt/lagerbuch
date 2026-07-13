@@ -9,12 +9,16 @@ export function Stepper({
   min = 1,
   max = 999,
   sm = false,
+  noText = false,
 }: {
   wert: number;
   setWert: (wert: number) => void;
   min?: number;
   max?: number;
   sm?: boolean;
+  // noText: nur +/- , der Wert ist nicht direkt tippbar. Für den Fahrzeug-Check gewünscht,
+  // damit unterwegs am Handy nicht versehentlich ins Zahlenfeld getippt wird.
+  noText?: boolean;
 }) {
   const clamp = (n: number) => Math.min(max, Math.max(min, n));
   // draft hält nur den Roh-Text WÄHREND der Direkteingabe; null = Feld spiegelt den wert-Prop.
@@ -43,17 +47,21 @@ export function Stepper({
       <button className="stepbtn" aria-label="Menge verringern" onClick={() => { setDraft(null); setWert(clamp(wert - 1)); }}>
         <Minus size={sm ? 14 : 18} />
       </button>
-      <input
-        className="stepval"
-        type="text"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        aria-label="Menge"
-        value={anzeige}
-        onChange={(e) => tippen(e.target.value)}
-        onFocus={(e) => e.currentTarget.select()}
-        onBlur={abschliessen}
-      />
+      {noText ? (
+        <div className="stepval" aria-label="Menge" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{wert}</div>
+      ) : (
+        <input
+          className="stepval"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          aria-label="Menge"
+          value={anzeige}
+          onChange={(e) => tippen(e.target.value)}
+          onFocus={(e) => e.currentTarget.select()}
+          onBlur={abschliessen}
+        />
+      )}
       <button className="stepbtn" aria-label="Menge erhöhen" onClick={() => { setDraft(null); setWert(clamp(wert + 1)); }}>
         <Plus size={sm ? 14 : 18} />
       </button>
