@@ -15,6 +15,13 @@
       "when": 1783691572392,
       "tag": "0001_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783955558858,
+      "tag": "0002_bz_sauerstoff",
+      "breakpoints": true
     }
   ]
 }
