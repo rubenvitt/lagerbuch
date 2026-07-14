@@ -15,6 +15,7 @@ export type ArtikelRow = {
   fach: string;
   mindestbestand: number;
   bestand: number;
+  aktiv: boolean;
   naechsteCharge: { chargenNr: string; verfall: string } | null;
   unterMindest: boolean;
   naechsteAmpel: Ampel | null;
@@ -22,6 +23,9 @@ export type ArtikelRow = {
 };
 
 function StatusChips({ row }: { row: ArtikelRow }) {
+  if (!row.aktiv) {
+    return <span className="chip chip-grau">inaktiv</span>;
+  }
   if (!row.unterMindest && !row.naechsteAblaufText) {
     return <span className="chip chip-ok">ok</span>;
   }
@@ -66,7 +70,7 @@ export function ArtikelTable({ rows }: { rows: ArtikelRow[] }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="click" onClick={() => setSelectedId(row.id)}>
+              <tr key={row.id} className="click" onClick={() => setSelectedId(row.id)} style={row.aktiv ? undefined : { opacity: 0.55 }}>
                 <td style={{ fontWeight: 600 }}>{row.name}</td>
                 <td>
                   <span className="fach">{row.fach}</span>

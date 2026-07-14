@@ -7,6 +7,7 @@ import { fmtTs, fmtVerfall, chipTone } from "@/lib/format";
 import { GeraetAktivToggle } from "./GeraetAktivToggle";
 import { ReferenzEditor } from "./ReferenzEditor";
 import { KontrolleForm } from "./KontrolleForm";
+import { LoeschButton } from "@/components/LoeschButton";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,23 @@ export default async function BzGeraetDetailPage({ params }: { params: Promise<{
           ))}
         </div>
       )}
+
+      <div className="gefahr">
+        <div className="gtitle">Gefahrenzone</div>
+        <p>
+          Gerät endgültig löschen. Das ist nur möglich, solange keine Kontrolle im Logbuch steht — sonst biete ich
+          stattdessen das Deaktivieren an.
+        </p>
+        <LoeschButton
+          art="bzGeraet"
+          id={g.id}
+          name={g.name}
+          typLabel="BZ-Gerät"
+          label="Gerät löschen"
+          className="btn btn-ghost-rot slim"
+          redirectTo="/verwaltung/bz"
+        />
+      </div>
     </>
   );
 }

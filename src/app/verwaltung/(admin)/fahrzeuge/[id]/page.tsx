@@ -6,6 +6,7 @@ import { fahrzeugListe, sollFuerFahrzeug, artikelListe, checkHistorie } from "@/
 import { fmtTs } from "@/lib/format";
 import { SollEditor } from "../SollEditor";
 import { FahrzeugAktivToggle } from "./FahrzeugAktivToggle";
+import { LoeschButton } from "@/components/LoeschButton";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,23 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
           ))}
         </div>
       )}
+
+      <div className="gefahr">
+        <div className="gtitle">Gefahrenzone</div>
+        <p>
+          Fahrzeug endgültig löschen. Das ist nur möglich, wenn keine Buchungen, Soll-Positionen, Checks, Geräte oder
+          Codes mehr daran hängen — sonst biete ich stattdessen das Deaktivieren an.
+        </p>
+        <LoeschButton
+          art="fahrzeug"
+          id={fahrzeug.id}
+          name={fahrzeug.name}
+          typLabel="Fahrzeug"
+          label="Fahrzeug löschen"
+          className="btn btn-ghost-rot slim"
+          redirectTo="/verwaltung/fahrzeuge"
+        />
+      </div>
     </>
   );
 }

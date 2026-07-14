@@ -24,7 +24,7 @@ export type ArtikelDetailBuchung = {
 };
 
 export type ArtikelDetailResult = {
-  artikel: { id: string; name: string; einheit: string; fach: string; mindestbestand: number };
+  artikel: { id: string; name: string; einheit: string; fach: string; mindestbestand: number; aktiv: boolean };
   bestand: number;
   chargen: ArtikelDetailCharge[];
   buchungen: ArtikelDetailBuchung[];
@@ -54,6 +54,7 @@ export async function getDetail(id: string): Promise<ArtikelDetailResult> {
       einheit: detail.artikel.einheit,
       fach: detail.artikel.fach,
       mindestbestand: detail.artikel.mindestbestand,
+      aktiv: detail.artikel.aktiv,
     },
     bestand: detail.bestand,
     chargen,

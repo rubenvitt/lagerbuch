@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Minus, Plus, X } from "lucide-react";
+import { AlertTriangle, Minus, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Plakette } from "@/components/Plakette";
 import { Stepper } from "@/components/Stepper";
-import { updateArtikel } from "@/actions/artikel";
+import { LoeschDialog } from "@/components/LoeschDialog";
+import { updateArtikel, setArtikelAktiv } from "@/actions/artikel";
 import { bucheZugang, bucheEntnahme } from "@/actions/buchung";
 import { getDetail, type ArtikelDetailResult } from "@/actions/detail";
 import { chipTone, fmtTs, fmtVerfall, typLabel } from "@/lib/format";
@@ -33,6 +34,7 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loeschOffen, setLoeschOffen] = useState(false);
   const mindestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = useCallback(async () => {
@@ -130,6 +132,19 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
     }
   }
 
+  async function onReaktivieren() {
+    setBusy(true);
+    setError(null);
+    try {
+      await setArtikelAktiv({ id, aktiv: true });
+      await afterMutation();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Reaktivieren fehlgeschlagen");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (detail === undefined) {
     return (
       <div className="drawerdim" onClick={onClose}>
@@ -165,6 +180,7 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
   const worstAblauf = detail.chargen.find((c) => c.ampel !== "gruen") ?? null;
 
   return (
+    <>
     <div className="drawerdim" onClick={onClose}>
       <div className="drawer" onClick={(e) => e.stopPropagation()}>
         <div className="sheettitle">
@@ -174,7 +190,8 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
           </button>
         </div>
         <div className="rowmeta" style={{ margin: "0 0 12px" }}>
-          {!unterMindest && !worstAblauf && <span className="chip chip-ok">ok</span>}
+          {!detail.artikel.aktiv && <span className="chip chip-grau">inaktiv</span>}
+          {detail.artikel.aktiv && !unterMindest && !worstAblauf && <span className="chip chip-ok">ok</span>}
           {unterMindest && (
             <span className="chip chip-rot">
               <AlertTriangle size={11} /> unter Mindestbestand
@@ -182,6 +199,12 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
           )}
           {worstAblauf && <span className={`chip chip-${chipTone(worstAblauf.ampel)}`}>Charge {worstAblauf.text}</span>}
         </div>
+
+        {!detail.artikel.aktiv && (
+          <div className="infobox" style={{ marginBottom: 12 }}>
+            <span>Dieser Artikel ist deaktiviert und erscheint nicht in den aktiven Listen.</span>
+          </div>
+        )}
 
         {error && (
           <div style={{ color: "var(--rot)", fontSize: 12.5, fontWeight: 600, marginBottom: 10 }}>{error}</div>
@@ -310,7 +333,42 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
             );
           })}
         </div>
+
+        <div className="gefahr">
+          <div className="gtitle">Gefahrenzone</div>
+          {detail.artikel.aktiv ? (
+            <p>Artikel deaktivieren (archivieren) oder — wenn keine Historie existiert — endgültig löschen.</p>
+          ) : (
+            <p>Artikel wieder aktivieren oder — wenn keine Historie existiert — endgültig löschen.</p>
+          )}
+          <div className="btnrow" style={{ flexWrap: "wrap" }}>
+            {!detail.artikel.aktiv && (
+              <button className="btn btn-ghost slim" disabled={busy} onClick={onReaktivieren}>
+                <RotateCcw size={15} /> Reaktivieren
+              </button>
+            )}
+            <button className="btn btn-ghost-rot slim" disabled={busy} onClick={() => setLoeschOffen(true)}>
+              <Trash2 size={15} /> Artikel löschen
+            </button>
+          </div>
+        </div>
       </div>
     </div>
+
+    {loeschOffen && (
+      <LoeschDialog
+        art="artikel"
+        id={id}
+        name={detail.artikel.name}
+        typLabel="Artikel"
+        onClose={() => setLoeschOffen(false)}
+        onDone={() => {
+          setLoeschOffen(false);
+          router.refresh();
+          onClose();
+        }}
+      />
+    )}
+    </>
   );
 }

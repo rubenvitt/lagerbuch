@@ -180,6 +180,22 @@ input, select { font: inherit; }
 .mono{font-family:var(--mono);font-size:12px}
 .drawerdim{position:fixed;inset:0;background:rgba(16,20,24,.45);z-index:60;display:flex;justify-content:flex-end}
 .drawer{width:min(430px,100%);background:var(--papier);height:100%;overflow-y:auto;padding:18px 16px 30px;box-shadow:-18px 0 50px rgba(0,0,0,.25)}
+
+/* ——— Modal (zentriert, für bestätigungspflichtige Aktionen) ——— */
+.modaldim{position:fixed;inset:0;background:rgba(16,20,24,.55);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px}
+.modalbox{background:var(--karte);border:1px solid var(--linie);border-radius:16px;width:min(440px,100%);max-height:90vh;overflow-y:auto;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.modalhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
+.modalhead h2{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.03em}
+.modalsub{font-size:14px;color:var(--stahl);margin-bottom:14px}
+.modalnote{font-size:12.5px;color:var(--stahl);line-height:1.55;margin-top:11px}
+.warnbox{display:flex;gap:9px;background:var(--rot-bg);color:var(--rot);border-radius:10px;padding:11px 13px;font-size:13px;line-height:1.5;font-weight:600}
+.infobox{display:flex;gap:9px;background:var(--gelb-bg);color:var(--gelb);border-radius:10px;padding:11px 13px;font-size:13px;line-height:1.5;font-weight:600}
+
+/* ——— Gefahrenzone (destruktive Aktionen, klar abgesetzt) ——— */
+.gefahr{border:1px solid var(--rot);border-radius:14px;padding:14px;margin-top:22px;background:var(--karte)}
+.gefahr .gtitle{font-family:var(--display);font-weight:700;font-size:13.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--rot);margin-bottom:6px}
+.gefahr p{font-size:12.5px;color:var(--stahl);line-height:1.55;margin-bottom:11px}
+.btn-ghost-rot{border:1.5px solid var(--rot);background:var(--karte);color:var(--rot)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .vehchips{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 

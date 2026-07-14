@@ -13,7 +13,7 @@ export default function ArtikelPage() {
   const now = new Date();
   const opts = { kritisch: config.warnTageKritisch, faellig: config.warnTageFaellig };
 
-  const rows: ArtikelRow[] = artikelListe(db).map((a) => {
+  const rows: ArtikelRow[] = artikelListe(db, { inklInaktiv: true }).map((a) => {
     const naechsteStatus = a.naechsteCharge ? verfallStatus(a.naechsteCharge.verfall, opts, now) : null;
     return {
       ...a,
