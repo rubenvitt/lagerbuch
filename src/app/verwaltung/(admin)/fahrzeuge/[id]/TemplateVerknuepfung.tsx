@@ -28,16 +28,16 @@ export function TemplateVerknuepfung({
 
   if (templateId) {
     return (
-      <div className="card cardpad" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="card cardpad cardrow">
         <div style={{ flex: 1, minWidth: 180 }}>
           <div style={{ fontWeight: 600 }}>Vorlage: {templateName ?? "–"}</div>
           {msg && <small style={{ color: "var(--stahl)" }}>{msg}</small>}
         </div>
-        <button className="btn btn-ghost slim" style={{ width: "auto" }} disabled={pending}
+        <button className="btn btn-ghost slim" disabled={pending}
           onClick={() => start(async () => { const e = await fahrzeugTemplateSync({ fahrzeugId }); setMsg(`Sync: ${fmtSync(e)}`); })}>
           <RefreshCw size={15} /> Sync
         </button>
-        <button className="btn btn-ghost slim" style={{ width: "auto" }} disabled={pending}
+        <button className="btn btn-ghost slim" disabled={pending}
           onClick={() => start(async () => { await fahrzeugTemplateLoesen({ fahrzeugId }); setMsg("Verknüpfung gelöst – Positionen bleiben als individuelle Bestückung."); })}>
           <Link2Off size={15} /> Verknüpfung lösen
         </button>
@@ -46,7 +46,7 @@ export function TemplateVerknuepfung({
   }
 
   return (
-    <div className="card cardpad" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+    <div className="card cardpad cardrow">
       <div style={{ flex: 1, minWidth: 180 }}>
         <div style={{ fontWeight: 600 }}>Keine Vorlage</div>
         <small style={{ color: "var(--stahl)" }}>{msg ?? "Individuell gepackt. Vorlage zuweisen oder aus diesem Fahrzeug erstellen."}</small>
@@ -54,28 +54,28 @@ export function TemplateVerknuepfung({
       {!wechseln && !neuOpen && (
         <>
           {templates.length > 0 && (
-            <button className="btn btn-ghost slim" style={{ width: "auto" }} onClick={() => setWechseln(true)}><Link2 size={15} /> Vorlage zuweisen</button>
+            <button className="btn btn-ghost slim" onClick={() => setWechseln(true)}><Link2 size={15} /> Vorlage zuweisen</button>
           )}
           {hatPositionen && (
-            <button className="btn btn-ghost slim" style={{ width: "auto" }} onClick={() => setNeuOpen(true)}><Copy size={15} /> Vorlage aus Fahrzeug</button>
+            <button className="btn btn-ghost slim" onClick={() => setNeuOpen(true)}><Copy size={15} /> Vorlage aus Fahrzeug</button>
           )}
         </>
       )}
       {wechseln && (
         <>
-          <select className="input" value={wahl} onChange={(e) => setWahl(e.target.value)} style={{ minWidth: 160 }}>
+          <select className="input" value={wahl} onChange={(e) => setWahl(e.target.value)} style={{ width: "auto", flex: "1 1 160px" }}>
             <option value="">Vorlage wählen…</option>
             {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <button className="btn btn-rot" disabled={pending || !wahl} onClick={() => start(async () => { const e = await fahrzeugTemplateZuweisen({ fahrzeugId, templateId: wahl }); setMsg(`Zugewiesen · ${fmtSync(e)}`); setWechseln(false); })}>Zuweisen</button>
-          <button className="btn btn-ghost slim" style={{ width: "auto" }} onClick={() => setWechseln(false)}>Abbrechen</button>
+          <button className="btn btn-rot slim" disabled={pending || !wahl} onClick={() => start(async () => { const e = await fahrzeugTemplateZuweisen({ fahrzeugId, templateId: wahl }); setMsg(`Zugewiesen · ${fmtSync(e)}`); setWechseln(false); })}>Zuweisen</button>
+          <button className="btn btn-ghost slim" onClick={() => setWechseln(false)}>Abbrechen</button>
         </>
       )}
       {neuOpen && (
         <>
-          <input className="input" placeholder="Name der Vorlage" value={neuName} autoFocus onChange={(e) => setNeuName(e.target.value)} style={{ minWidth: 160 }} />
-          <button className="btn btn-rot" disabled={pending || !neuName.trim()} onClick={() => start(async () => { await templateAusFahrzeug({ fahrzeugId, name: neuName.trim(), verknuepfen: true }); setMsg("Vorlage erstellt und verknüpft."); setNeuOpen(false); setNeuName(""); })}>Erstellen</button>
-          <button className="btn btn-ghost slim" style={{ width: "auto" }} onClick={() => setNeuOpen(false)}>Abbrechen</button>
+          <input className="input" placeholder="Name der Vorlage" value={neuName} autoFocus onChange={(e) => setNeuName(e.target.value)} style={{ width: "auto", flex: "1 1 160px" }} />
+          <button className="btn btn-rot slim" disabled={pending || !neuName.trim()} onClick={() => start(async () => { await templateAusFahrzeug({ fahrzeugId, name: neuName.trim(), verknuepfen: true }); setMsg("Vorlage erstellt und verknüpft."); setNeuOpen(false); setNeuName(""); })}>Erstellen</button>
+          <button className="btn btn-ghost slim" onClick={() => setNeuOpen(false)}>Abbrechen</button>
         </>
       )}
     </div>

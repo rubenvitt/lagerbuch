@@ -20,7 +20,7 @@ export default async function VorlageDetailPage({ params }: { params: Promise<{ 
   return (
     <>
       <Link className="backlink" href="/verwaltung/vorlagen"><ArrowLeft size={15} /> Vorlagen</Link>
-      <div className="mainhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      <div className="mainhead">
         <h1>
           {vorlage.name}
           {!vorlage.aktiv && <span className="chip chip-grau" style={{ marginLeft: 10 }}>inaktiv</span>}
@@ -34,10 +34,10 @@ export default async function VorlageDetailPage({ params }: { params: Promise<{ 
         <div className="kpi"><b>{vorlage.fahrzeuge.length}</b><div>Fahrzeuge</div></div>
       </div>
 
-      <div className="cardtitle" style={{ padding: "6px 2px 8px" }}>Bestückung der Vorlage</div>
+      <h2 className="secthead">Bestückung der Vorlage</h2>
       <TemplatePosEditor templateId={vorlage.id} positionen={vorlage.positionen} artikel={artikel} />
 
-      <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Verknüpfte Fahrzeuge</div>
+      <h2 className="secthead">Verknüpfte Fahrzeuge</h2>
       {vorlage.fahrzeuge.length === 0 ? (
         <div className="card cardpad">Noch keinem Fahrzeug zugewiesen. Zuweisen auf der jeweiligen Fahrzeug-Seite unter „Vorlage“.</div>
       ) : (

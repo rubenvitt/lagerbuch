@@ -18,10 +18,10 @@ export function MessungForm({ flascheId }: { flascheId: string }) {
   }
 
   return (
-    <div className="card cardpad" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-      <input className="input" style={{ width: 140 }} type="number" min={0} placeholder="Druck (bar)" value={druck} onChange={(e) => setDruck(e.target.value)} />
-      <input className="input" placeholder="Kommentar (optional)" value={kommentar} onChange={(e) => setKommentar(e.target.value)} style={{ minWidth: 180 }} />
-      <button className="btn btn-rot" disabled={pending || druck.trim() === ""} onClick={submit}>Erfassen</button>
+    <div className="card cardpad cardrow">
+      <input className="input" style={{ width: 140, flex: "none" }} type="number" min={0} placeholder="Druck (bar)" value={druck} onChange={(e) => setDruck(e.target.value)} />
+      <input className="input" placeholder="Kommentar (optional)" value={kommentar} onChange={(e) => setKommentar(e.target.value)} style={{ width: "auto", flex: "1 1 180px" }} />
+      <button className="btn btn-rot slim" disabled={pending || druck.trim() === ""} onClick={submit}>Erfassen</button>
     </div>
   );
 }

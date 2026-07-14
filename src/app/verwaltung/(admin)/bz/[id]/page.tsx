@@ -46,17 +46,17 @@ export default async function BzGeraetDetailPage({ params }: { params: Promise<{
         <div className={`kpi ${g.aktiv ? "ok" : "gelb"}`}><b>{g.aktiv ? "aktiv" : "inaktiv"}</b><div>Status · {lagerortName}</div></div>
       </div>
 
-      <div className="cardtitle" style={{ padding: "6px 2px 8px" }}>Referenz &amp; Streifen-Lot</div>
+      <h2 className="secthead">Referenz &amp; Streifen-Lot</h2>
       <ReferenzEditor geraet={g} lagerorte={optionen} />
 
-      <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Kontrolle erfassen</div>
+      <h2 className="secthead">Kontrolle erfassen</h2>
       <KontrolleForm
         geraetId={g.id}
         level1={{ label: g.level1Label, min: g.level1Min, max: g.level1Max }}
         level2={{ label: g.level2Label, min: g.level2Min, max: g.level2Max }}
       />
 
-      <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Logbuch ({logbuch.length})</div>
+      <h2 className="secthead">Logbuch ({logbuch.length})</h2>
       {logbuch.length === 0 ? (
         <div className="card cardpad">Für dieses Gerät wurde noch keine Kontrolle erfasst.</div>
       ) : (

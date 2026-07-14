@@ -160,26 +160,49 @@ input, select { font: inherit; }
 .sitem{display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:9px;color:#AEB8BF;font-weight:600;font-size:13.5px;border-left:3px solid transparent;text-align:left;width:100%}
 .sitem.on{background:rgba(255,255,255,.08);color:#fff;border-left-color:var(--rot)}
 .sitem .cnt{margin-left:auto;background:var(--rot);color:#fff;font-size:10.5px;font-weight:700;border-radius:99px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 5px}
-.main{flex:1;min-width:0;padding:24px 26px 60px;overflow-y:auto;height:100vh}
-.backlink{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--stahl);margin-bottom:10px}
+.main{flex:1;min-width:0;padding:20px 24px 48px;overflow-y:auto;height:100vh}
+/* Lange Zeilen lesen sich auf breiten Monitoren schlecht – Inhalt deckeln, Overlays (fixed) nicht */
+.main>.mainhead,.main>.backlink,.main>.kpis,.main>.secthead,.main>.card,.main>section,.main>.gefahr,.main>.filters,.main>.footnote,.main>p{max-width:1100px}
+/* Verwaltung ist Maus/Desktop-UI: dichter als die Helfer-Touch-App */
+.main .row{padding:9px 12px}
+.main .cardpad{padding:11px 12px}
+.main .cardtitle{padding:10px 12px 0}
+.backlink{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--stahl);margin-bottom:8px}
 .backlink:hover{color:var(--tinte)}
-.mainhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-.mainhead h1{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:.04em}
-.mainhead p{width:100%;font-size:13px;color:var(--stahl);margin-top:-6px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
-.kpi{background:var(--karte);border:1px solid var(--linie);border-left:4px solid var(--stahl);border-radius:12px;padding:12px 14px}
+.mainhead{display:flex;align-items:center;justify-content:space-between;gap:4px 12px;margin-bottom:14px;flex-wrap:wrap}
+.mainhead h1{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:.04em;line-height:1.2}
+.mainhead p{width:100%;font-size:13px;color:var(--stahl);margin:0}
+.secthead{font-family:var(--display);font-weight:600;font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--stahl);margin:18px 2px 7px}
+.kpis+.secthead,.mainhead+.secthead{margin-top:4px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:12px}
+.kpi{display:flex;align-items:baseline;gap:9px;min-width:0;background:var(--karte);border:1px solid var(--linie);border-left:4px solid var(--stahl);border-radius:10px;padding:10px 12px}
 .kpi.rot{border-left-color:var(--rot)} .kpi.gelb{border-left-color:var(--gelb)} .kpi.ok{border-left-color:var(--ok)}
-.kpi b{font-family:var(--display);font-weight:700;font-size:30px;line-height:1}
-.kpi div{font-size:12px;color:var(--stahl);font-weight:600;margin-top:3px}
+.kpi b{font-family:var(--display);font-weight:700;font-size:23px;line-height:1;flex:none}
+.kpi div{font-size:12px;color:var(--stahl);font-weight:600;line-height:1.3;min-width:0}
 .tbl{width:100%;border-collapse:collapse;font-size:13.5px}
-.tbl th{font:600 11px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--stahl);text-align:left;padding:9px 12px;border-bottom:1.5px solid var(--linie);white-space:nowrap}
-.tbl td{padding:10px 12px;border-bottom:1px solid var(--linie);vertical-align:middle}
+.tbl th{font:600 11px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--stahl);text-align:left;padding:8px 10px;border-bottom:1.5px solid var(--linie);white-space:nowrap}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--linie);vertical-align:middle}
+.card:has(.tbl){overflow-x:auto}
 .tbl tr:last-child td{border-bottom:none}
 .tbl tr.click:hover{background:#F6F8F9;cursor:pointer}
 .tbl .num{font-family:var(--display);font-weight:700;font-size:17px}
 .mono{font-family:var(--mono);font-size:12px}
 .drawerdim{position:fixed;inset:0;background:rgba(16,20,24,.45);z-index:60;display:flex;justify-content:flex-end}
 .drawer{width:min(430px,100%);background:var(--papier);height:100%;overflow-y:auto;padding:18px 16px 30px;box-shadow:-18px 0 50px rgba(0,0,0,.25)}
+
+/* Fach-Gruppierung innerhalb einer Card: schmale Streifen statt frei schwebender Labels */
+.card .fachhead{margin:0;padding:7px 12px 5px;font-size:11.5px;background:#f6f8f9;border-top:1px solid var(--linie)}
+.card>div:first-child>.fachhead{border-top:none}
+/* Kompakte Eingabezeile am Card-Ende (Position hinzufügen o. ä.) */
+.addrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;border-top:1px solid var(--linie);background:#f6f8f9}
+.addrow .input{flex:1 1 150px;width:auto;min-width:0}
+.addrow .btn{width:auto;flex:none}
+.input.qty{width:62px;flex:none;text-align:center;padding:9px 6px}
+.btn-icon{width:36px;height:36px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--linie);border-radius:9px;background:var(--karte);color:var(--stahl)}
+.btn-icon:hover{border-color:var(--rot);color:var(--rot)}
+.btn-icon[disabled]{opacity:.45;cursor:default}
+.cardrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cardnote{padding:9px 12px;font-size:12.5px;color:var(--stahl)}
 
 /* ——— Modal (zentriert, für bestätigungspflichtige Aktionen) ——— */
 .modaldim{position:fixed;inset:0;background:rgba(16,20,24,.55);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -206,7 +229,11 @@ input, select { font: inherit; }
   .sitem{white-space:nowrap;border-left:none;border-bottom:3px solid transparent;padding:8px 10px}
   .sitem.on{border-bottom-color:var(--rot)}
   .side .brandsub,.side .logout-label{display:none}
-  .main{height:auto;padding:16px 14px 60px}
+  .main{height:auto;padding:14px 12px 48px}
+  .mainhead h1{font-size:21px}
+  .kpis{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .kpi{padding:9px 11px;gap:8px}
+  .kpi b{font-size:20px}
 }
 
 /* ——— Etiketten (Bildschirm) ——— */

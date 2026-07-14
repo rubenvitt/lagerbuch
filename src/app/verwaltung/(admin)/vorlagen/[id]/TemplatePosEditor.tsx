@@ -38,19 +38,19 @@ export function TemplatePosEditor({ templateId, positionen, artikel }: { templat
                 <div className="rowname">{p.artikelName}</div>
                 <div className="rowmeta"><span className="fach">{p.handlagerFach}</span><small>{p.einheit}</small></div>
               </div>
-              <input className="input" style={{ width: 64, flex: "none" }} type="number" min={1} defaultValue={p.soll}
+              <input className="input qty" type="number" min={1} defaultValue={p.soll}
                 onBlur={(e) => { const n = Number(e.target.value); if (n >= 1 && n !== p.soll) start(async () => { await templatePositionSetzen({ id: p.id, templateId, fachLabel: p.fachLabel, artikelId: p.artikelId, soll: n, sort: p.sort }); }); }} />
-              <button className="btn btn-ghost" style={{ flex: "none", width: "auto" }} disabled={pending} onClick={() => start(async () => { await templatePositionEntfernen({ id: p.id }); })}><Trash2 size={15} /></button>
+              <button className="btn-icon" aria-label="Position entfernen" disabled={pending} onClick={() => start(async () => { await templatePositionEntfernen({ id: p.id }); })}><Trash2 size={15} /></button>
             </div>
           ))}
         </div>
       ))}
-      <div className="cardpad" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--linie)" }}>
+      <div className="addrow">
         {freitext ? (
           <>
-            <input className="input" placeholder="Neues Fach, z. B. Schrank 1" value={fach} autoFocus={neuFach} onChange={(e) => setFach(e.target.value)} style={{ minWidth: 150 }} />
+            <input className="input" placeholder="Neues Fach, z. B. Schrank 1" value={fach} autoFocus={neuFach} onChange={(e) => setFach(e.target.value)} />
             {faecher.length > 0 && (
-              <button className="btn btn-ghost slim" style={{ width: "auto", flex: "none" }} onClick={() => { setNeuFach(false); setFach(""); }}>Abbrechen</button>
+              <button className="btn btn-ghost slim" onClick={() => { setNeuFach(false); setFach(""); }}>Abbrechen</button>
             )}
           </>
         ) : (
@@ -58,7 +58,6 @@ export function TemplatePosEditor({ templateId, positionen, artikel }: { templat
             className="input"
             value={fach}
             onChange={(e) => { if (e.target.value === "__neu__") { setNeuFach(true); setFach(""); } else setFach(e.target.value); }}
-            style={{ minWidth: 150 }}
           >
             <option value="">Fach wählen…</option>
             {faecher.map((f) => <option key={f} value={f}>{f}</option>)}
@@ -69,8 +68,8 @@ export function TemplatePosEditor({ templateId, positionen, artikel }: { templat
           <option value="">Artikel wählen…</option>
           {artikel.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-        <input className="input" style={{ width: 70 }} type="number" min={1} value={soll} onChange={(e) => setSoll(Number(e.target.value))} />
-        <button className="btn btn-rot" disabled={pending || !fach.trim() || !artikelId} onClick={add}><Plus size={15} /> Position</button>
+        <input className="input qty" type="number" min={1} value={soll} onChange={(e) => setSoll(Number(e.target.value))} />
+        <button className="btn btn-rot slim" disabled={pending || !fach.trim() || !artikelId} onClick={add}><Plus size={15} /> Position</button>
       </div>
     </div>
   );

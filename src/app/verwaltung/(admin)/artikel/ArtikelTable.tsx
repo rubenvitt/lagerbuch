@@ -56,7 +56,7 @@ export function ArtikelTable({ rows }: { rows: ArtikelRow[] }) {
         </button>
         <p>Handlager · Klick auf eine Zeile öffnet Chargen, Buchung und Stammdaten.</p>
       </div>
-      <div className="card" style={{ overflowX: "auto" }}>
+      <div className="card">
         <table className="tbl">
           <thead>
             <tr>
