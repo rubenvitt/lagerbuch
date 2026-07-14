@@ -9,7 +9,37 @@ export const lagerorte = sqliteTable("lagerorte", {
   typ: text("typ", { enum: ["lager", "fahrzeug"] }).notNull(),
   kennung: text("kennung"),
   aktiv: integer("aktiv", { mode: "boolean" }).notNull().default(true),
+  // Optionale Vorlage, an der ein Fahrzeug hängt. null = individuell gepackt (Alt-Verhalten).
+  // Beim Sync werden die Vorlagen-Positionen in soll_positionen materialisiert (siehe unten),
+  // damit der Check-Flow unverändert gegen soll_positionen läuft.
+  templateId: text("template_id").references(() => fahrzeugTemplates.id),
 });
+
+// ── Fahrzeug-Vorlagen ───────────────────────────────────────────────────────
+// Mehrere Fahrzeuge sind identisch gepackt: Eine Vorlage definiert die Soll-Bestückung
+// einmal und wird auf beliebig viele Fahrzeuge übertragen. Pro Fahrzeug bleiben manuelle
+// Überschreibungen möglich (soll_positionen.ueberschrieben / .entfernt), die ein erneuter
+// Sync nicht überschreibt.
+
+export const fahrzeugTemplates = sqliteTable("fahrzeug_templates", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  aktiv: integer("aktiv", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+export const templatePositionen = sqliteTable(
+  "template_positionen",
+  {
+    id: text("id").primaryKey(),
+    templateId: text("template_id").notNull().references(() => fahrzeugTemplates.id),
+    fachLabel: text("fach_label").notNull(),
+    sort: integer("sort").notNull().default(0),
+    artikelId: text("artikel_id").notNull().references(() => artikel.id),
+    soll: integer("soll").notNull(),
+  },
+  (t) => [index("idx_template_pos_template").on(t.templateId)],
+);
 
 export const artikel = sqliteTable("artikel", {
   id: text("id").primaryKey(),
@@ -65,6 +95,14 @@ export const sollPositionen = sqliteTable(
     sort: integer("sort").notNull().default(0),
     artikelId: text("artikel_id").notNull().references(() => artikel.id),
     soll: integer("soll").notNull(),
+    // Herkunft aus einer Vorlage. null = manuell/individuell (Alt-Verhalten, bleibt beim Sync
+    // unangetastet). Gesetzt = aus templatePositionen materialisiert.
+    templatePositionId: text("template_position_id").references(() => templatePositionen.id),
+    // Manuell abweichend von der Vorlage (z. B. andere Soll-Menge): Sync lässt die Zeile in Ruhe.
+    ueberschrieben: integer("ueberschrieben", { mode: "boolean" }).notNull().default(false),
+    // Auf diesem Fahrzeug bewusst NICHT vorhanden (Grabstein). Zählt nirgends als Soll,
+    // verhindert aber, dass der Sync die Vorlagen-Position wieder anlegt.
+    entfernt: integer("entfernt", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [index("idx_soll_fahrzeug").on(t.fahrzeugId)],
 );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarClock, ClipboardCheck, ClipboardList, HeartPulse, History, KeyRound, LayoutDashboard, Package, QrCode, ShoppingCart, Truck, Upload, Wind } from "lucide-react";
+import { CalendarClock, ClipboardCheck, ClipboardList, HeartPulse, History, KeyRound, LayoutDashboard, LayoutTemplate, Package, QrCode, ShoppingCart, Truck, Upload, Wind } from "lucide-react";
 import type { ComponentType } from "react";
 
 const NAV: { href: string; label: string; icon: ComponentType<{ size?: number }> }[] = [
@@ -10,6 +10,7 @@ const NAV: { href: string; label: string; icon: ComponentType<{ size?: number }>
   { href: "/verwaltung/artikel", label: "Artikel", icon: Package },
   { href: "/verwaltung/verfall", label: "Verfall", icon: CalendarClock },
   { href: "/verwaltung/fahrzeuge", label: "Fahrzeuge", icon: Truck },
+  { href: "/verwaltung/vorlagen", label: "Vorlagen", icon: LayoutTemplate },
   { href: "/verwaltung/checks", label: "Checks", icon: ClipboardCheck },
   { href: "/verwaltung/bz", label: "BZ-Kontrolle", icon: HeartPulse },
   { href: "/verwaltung/sauerstoff", label: "Sauerstoff", icon: Wind },

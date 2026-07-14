@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { getDb } from "@/db";
-import { fahrzeugListe, sollFuerFahrzeug, artikelListe, checkHistorie } from "@/db/queries";
+import { fahrzeugListe, sollFuerFahrzeug, artikelListe, checkHistorie, templateListeAktiv, templateDetail } from "@/db/queries";
 import { fmtTs } from "@/lib/format";
 import { SollEditor } from "../SollEditor";
 import { FahrzeugAktivToggle } from "./FahrzeugAktivToggle";
 import { LoeschButton } from "@/components/LoeschButton";
+import { TemplateVerknuepfung } from "./TemplateVerknuepfung";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +18,14 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
   if (!fahrzeug) notFound();
 
   const positionen = sollFuerFahrzeug(db, id);
+  const aktivePositionen = positionen.filter((p) => !p.entfernt); // Grabsteine zählen nicht als Soll
   const artikel = artikelListe(db).map((a) => ({ id: a.id, name: a.name, fach: a.fach, einheit: a.einheit }));
-  const faecher = new Set(positionen.map((p) => p.fachLabel)).size;
-  const unterSoll = positionen.filter((p) => p.fahrzeugBestand < p.soll).length;
+  const faecher = new Set(aktivePositionen.map((p) => p.fachLabel)).size;
+  const unterSoll = aktivePositionen.filter((p) => p.fahrzeugBestand < p.soll).length;
   const checks = checkHistorie(db).filter((c) => c.fahrzeugId === id).slice(0, 8);
+  // Verknüpfte Vorlage sperrt sich selbst aus der Auswahlliste aus (kein „auf sich selbst" zuweisen).
+  const templates = templateListeAktiv(db).filter((t) => t.id !== fahrzeug.templateId);
+  const templateName = fahrzeug.templateId ? (templateDetail(db, fahrzeug.templateId)?.name ?? null) : null;
 
   return (
     <>
@@ -34,14 +39,17 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
       </div>
 
       <div className="kpis">
-        <div className="kpi"><b>{positionen.length}</b><div>Soll-Positionen</div></div>
+        <div className="kpi"><b>{aktivePositionen.length}</b><div>Soll-Positionen</div></div>
         <div className="kpi"><b>{faecher}</b><div>Fächer</div></div>
         <div className={`kpi ${unterSoll ? "rot" : "ok"}`}><b>{unterSoll}</b><div>Positionen unter Soll</div></div>
         <div className={`kpi ${fahrzeug.aktiv ? "ok" : "gelb"}`}><b>{fahrzeug.aktiv ? "aktiv" : "inaktiv"}</b><div>Status</div></div>
       </div>
 
-      <div className="cardtitle" style={{ padding: "6px 2px 8px" }}>Soll-Bestückung</div>
-      <SollEditor fahrzeugId={fahrzeug.id} positionen={positionen} artikel={artikel} />
+      <div className="cardtitle" style={{ padding: "6px 2px 8px" }}>Vorlage</div>
+      <TemplateVerknuepfung fahrzeugId={fahrzeug.id} templateId={fahrzeug.templateId} templateName={templateName} templates={templates} hatPositionen={aktivePositionen.length > 0} />
+
+      <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Soll-Bestückung</div>
+      <SollEditor fahrzeugId={fahrzeug.id} positionen={positionen} artikel={artikel} hatTemplate={Boolean(fahrzeug.templateId)} />
 
       <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Letzte Checks</div>
       {checks.length === 0 ? (

@@ -27,6 +27,7 @@ export default function FahrzeugePage() {
                 </div>
                 <div className="rowmeta">
                   {!f.aktiv && <span className="chip chip-grau">inaktiv</span>}
+                  {f.templateName && <span className="chip chip-grau">{f.templateName}</span>}
                   <small>
                     {f.positionen} Position{f.positionen === 1 ? "" : "en"}
                     {f.faecher > 0 ? ` · ${f.faecher} ${f.faecher === 1 ? "Fach" : "Fächer"}` : ""}

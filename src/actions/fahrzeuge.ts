@@ -38,11 +38,20 @@ export async function sollPositionSetzen(input: z.input<typeof SollSchema>, db: 
   const v = SollSchema.parse(input);
   const id = v.id ?? newId();
   if (v.id) {
-    db.update(sollPositionen).set({ fahrzeugId: v.fahrzeugId, fachLabel: v.fachLabel, artikelId: v.artikelId, soll: v.soll, sort: v.sort }).where(eq(sollPositionen.id, v.id)).run();
+    // Wird eine aus einer Vorlage stammende Position bearbeitet, gilt sie als manuell
+    // überschrieben und wird von einem späteren Sync nicht mehr angeglichen. Eine zuvor
+    // entfernte Position (Grabstein) wird durch das Setzen wieder aktiviert.
+    const row = db.select().from(sollPositionen).where(eq(sollPositionen.id, v.id)).get();
+    const ueberschrieben = row?.templatePositionId ? true : (row?.ueberschrieben ?? false);
+    db.update(sollPositionen)
+      .set({ fahrzeugId: v.fahrzeugId, fachLabel: v.fachLabel, artikelId: v.artikelId, soll: v.soll, sort: v.sort, ueberschrieben, entfernt: false })
+      .where(eq(sollPositionen.id, v.id))
+      .run();
   } else {
     db.insert(sollPositionen).values({ id, fahrzeugId: v.fahrzeugId, fachLabel: v.fachLabel, artikelId: v.artikelId, soll: v.soll, sort: v.sort }).run();
   }
   revalidatePath("/verwaltung/fahrzeuge");
+  revalidatePath(`/verwaltung/fahrzeuge/${v.fahrzeugId}`);
   return { id };
 }
 
@@ -50,6 +59,25 @@ const EntfernenSchema = z.object({ id: z.string().min(1) });
 export async function sollPositionEntfernen(input: z.input<typeof EntfernenSchema>, db: DB = getDb()) {
   await requireAdmin();
   const v = EntfernenSchema.parse(input);
-  db.delete(sollPositionen).where(eq(sollPositionen.id, v.id)).run();
+  const row = db.select().from(sollPositionen).where(eq(sollPositionen.id, v.id)).get();
+  if (row?.templatePositionId) {
+    // Aus einer Vorlage stammend: nicht löschen, sondern als „auf diesem Fahrzeug nicht
+    // vorhanden" markieren — sonst würde der nächste Sync die Position wieder anlegen.
+    db.update(sollPositionen).set({ entfernt: true }).where(eq(sollPositionen.id, v.id)).run();
+  } else {
+    db.delete(sollPositionen).where(eq(sollPositionen.id, v.id)).run();
+  }
+  if (row) revalidatePath(`/verwaltung/fahrzeuge/${row.fahrzeugId}`);
+  revalidatePath("/verwaltung/fahrzeuge");
+}
+
+// Stellt eine als entfernt markierte Vorlagen-Position wieder her (Grabstein aufheben).
+const WiederherstellenSchema = z.object({ id: z.string().min(1) });
+export async function sollPositionWiederherstellen(input: z.input<typeof WiederherstellenSchema>, db: DB = getDb()) {
+  await requireAdmin();
+  const v = WiederherstellenSchema.parse(input);
+  const row = db.select().from(sollPositionen).where(eq(sollPositionen.id, v.id)).get();
+  db.update(sollPositionen).set({ entfernt: false }).where(eq(sollPositionen.id, v.id)).run();
+  if (row) revalidatePath(`/verwaltung/fahrzeuge/${row.fahrzeugId}`);
   revalidatePath("/verwaltung/fahrzeuge");
 }

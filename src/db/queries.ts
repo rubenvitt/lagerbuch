@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
-import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks } from "@/db/schema";
+import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks, fahrzeugTemplates, templatePositionen } from "@/db/schema";
 import { bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { verfallStatus } from "@/lib/domain/verfall";
@@ -177,7 +177,7 @@ export function verfallListe(db: DB): VerfallEintrag[] {
 
 export function fahrzeugListe(db: DB) {
   return db.select().from(lagerorte).where(eq(lagerorte.typ, "fahrzeug")).all()
-    .map((f) => ({ id: f.id, name: f.name, kennung: f.kennung, aktiv: f.aktiv }));
+    .map((f) => ({ id: f.id, name: f.name, kennung: f.kennung, aktiv: f.aktiv, templateId: f.templateId }));
 }
 
 export type FahrzeugUebersichtZeile = {
@@ -186,6 +186,7 @@ export type FahrzeugUebersichtZeile = {
   faecher: number; // Anzahl unterschiedlicher Fächer
   artikelUnterSoll: number; // Artikel, deren Fahrzeugbestand die Soll-Summe unterschreitet
   letzterCheck: Date | null; // completedAt des jüngsten Checks
+  templateName: string | null; // verknüpfte Vorlage, falls vorhanden
 };
 
 // Verdichtete Übersicht für die Fahrzeugliste: pro Fahrzeug nur Kennzahlen (kein Soll-Editor),
@@ -193,7 +194,9 @@ export type FahrzeugUebersichtZeile = {
 export function fahrzeugUebersicht(db: DB): FahrzeugUebersichtZeile[] {
   const fahrzeuge = db.select().from(lagerorte).where(eq(lagerorte.typ, "fahrzeug")).all();
   const allBu = db.select().from(buchungen).all();
-  const allSoll = db.select().from(sollPositionen).all();
+  // Grabsteine (entfernt) zählen nirgends als Soll.
+  const allSoll = db.select().from(sollPositionen).all().filter((s) => !s.entfernt);
+  const templateNamen = new Map(db.select().from(fahrzeugTemplates).all().map((t) => [t.id, t.name]));
   const letzterProFzg = new Map<string, Date>();
   for (const c of db.select().from(checks).all()) {
     if (!c.completedAt) continue;
@@ -217,18 +220,24 @@ export function fahrzeugUebersicht(db: DB): FahrzeugUebersichtZeile[] {
         id: f.id, name: f.name, kennung: f.kennung, aktiv: f.aktiv,
         positionen: soll.length, faecher: faecher.size, artikelUnterSoll,
         letzterCheck: letzterProFzg.get(f.id) ?? null,
+        templateName: f.templateId ? (templateNamen.get(f.templateId) ?? null) : null,
       };
     })
     .sort((a, b) => Number(b.aktiv) - Number(a.aktiv) || a.name.localeCompare(b.name));
 }
 
+export type SollHerkunft = "manuell" | "vorlage" | "ueberschrieben";
 export type SollZeile = {
   id: string; fachLabel: string; sort: number; artikelId: string; artikelName: string; einheit: string;
   handlagerFach: string; soll: number;
   fahrzeugBestand: number; // aktueller recorded Bestand AUF dem Fahrzeug (Ausgangspunkt des Abgleichs)
   handlagerBestand: number; // im Handlager verfügbar zum Nachfüllen
+  herkunft: SollHerkunft; // aus Vorlage, manuell überschrieben oder individuell
+  entfernt: boolean; // Grabstein: auf diesem Fahrzeug bewusst nicht vorhanden (zählt nicht als Soll)
 };
 
+// Liefert ALLE Soll-Zeilen inkl. Grabsteine (entfernt=true) mit Herkunfts-Flag. Anzeigen, die das
+// echte Soll brauchen (Helfer-Check, Kennzahlen), filtern `entfernt` selbst heraus.
 export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
   const arts = new Map(db.select().from(artikel).all().map((a) => [a.id, a]));
   const allBu = db.select().from(buchungen).all();
@@ -237,11 +246,13 @@ export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
     .map((p) => {
       const a = arts.get(p.artikelId);
       const bu = allBu.filter((x) => x.artikelId === p.artikelId).map((x) => ({ lagerortId: x.lagerortId, menge: x.menge }));
+      const herkunft: SollHerkunft = !p.templatePositionId ? "manuell" : p.ueberschrieben ? "ueberschrieben" : "vorlage";
       return {
         id: p.id, fachLabel: p.fachLabel, sort: p.sort, artikelId: p.artikelId,
         artikelName: a?.name ?? "–", einheit: a?.einheit ?? "", handlagerFach: a?.fach ?? "", soll: p.soll,
         fahrzeugBestand: bestandProLagerort(bu, fahrzeugId),
         handlagerBestand: bestandProLagerort(bu, HANDLAGER_ID),
+        herkunft, entfernt: p.entfernt,
       };
     })
     .sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.sort - y.sort);
@@ -372,4 +383,63 @@ export function tokenListe(db: DB) {
         zielTyp: t.zielTyp, zielId: t.zielId, zielName,
       };
     });
+}
+
+// ── Fahrzeug-Vorlagen ───────────────────────────────────────────────────────
+
+export type TemplateUebersichtZeile = {
+  id: string; name: string; aktiv: boolean;
+  positionen: number; faecher: number; fahrzeuge: number; // Anzahl verknüpfter Fahrzeuge
+};
+
+export function templateUebersicht(db: DB): TemplateUebersichtZeile[] {
+  const templates = db.select().from(fahrzeugTemplates).all();
+  const allPos = db.select().from(templatePositionen).all();
+  const fahrzeuge = db.select().from(lagerorte).where(eq(lagerorte.typ, "fahrzeug")).all();
+  return templates
+    .map((t) => {
+      const pos = allPos.filter((p) => p.templateId === t.id);
+      return {
+        id: t.id, name: t.name, aktiv: t.aktiv,
+        positionen: pos.length,
+        faecher: new Set(pos.map((p) => p.fachLabel)).size,
+        fahrzeuge: fahrzeuge.filter((f) => f.templateId === t.id).length,
+      };
+    })
+    .sort((a, b) => Number(b.aktiv) - Number(a.aktiv) || a.name.localeCompare(b.name));
+}
+
+export type TemplatePositionZeile = {
+  id: string; fachLabel: string; sort: number; artikelId: string; artikelName: string; einheit: string;
+  handlagerFach: string; soll: number;
+};
+export type TemplateDetail = {
+  id: string; name: string; aktiv: boolean;
+  positionen: TemplatePositionZeile[];
+  fahrzeuge: { id: string; name: string; kennung: string | null; aktiv: boolean }[];
+};
+
+export function templateDetail(db: DB, id: string): TemplateDetail | null {
+  const t = db.select().from(fahrzeugTemplates).where(eq(fahrzeugTemplates.id, id)).get();
+  if (!t) return null;
+  const arts = new Map(db.select().from(artikel).all().map((a) => [a.id, a]));
+  const positionen = db.select().from(templatePositionen).where(eq(templatePositionen.templateId, id)).all()
+    .map((p) => {
+      const a = arts.get(p.artikelId);
+      return {
+        id: p.id, fachLabel: p.fachLabel, sort: p.sort, artikelId: p.artikelId,
+        artikelName: a?.name ?? "–", einheit: a?.einheit ?? "", handlagerFach: a?.fach ?? "", soll: p.soll,
+      };
+    })
+    .sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.sort - y.sort);
+  const fahrzeuge = db.select().from(lagerorte).where(eq(lagerorte.templateId, id)).all()
+    .map((f) => ({ id: f.id, name: f.name, kennung: f.kennung, aktiv: f.aktiv }))
+    .sort((a, b) => Number(b.aktiv) - Number(a.aktiv) || a.name.localeCompare(b.name));
+  return { id: t.id, name: t.name, aktiv: t.aktiv, positionen, fahrzeuge };
+}
+
+export function templateListeAktiv(db: DB) {
+  return db.select().from(fahrzeugTemplates).where(eq(fahrzeugTemplates.aktiv, true)).all()
+    .map((t) => ({ id: t.id, name: t.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
