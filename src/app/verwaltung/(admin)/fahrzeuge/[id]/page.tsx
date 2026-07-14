@@ -30,7 +30,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
   return (
     <>
       <Link className="backlink" href="/verwaltung/fahrzeuge"><ArrowLeft size={15} /> Fahrzeuge</Link>
-      <div className="mainhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="mainhead">
         <h1>
           {fahrzeug.name}
           {fahrzeug.kennung ? <span className="mono" style={{ marginLeft: 10, color: "var(--stahl)", fontSize: 15 }}>{fahrzeug.kennung}</span> : null}
@@ -45,13 +45,13 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
         <div className={`kpi ${fahrzeug.aktiv ? "ok" : "gelb"}`}><b>{fahrzeug.aktiv ? "aktiv" : "inaktiv"}</b><div>Status</div></div>
       </div>
 
-      <div className="cardtitle" style={{ padding: "6px 2px 8px" }}>Vorlage</div>
+      <h2 className="secthead">Vorlage</h2>
       <TemplateVerknuepfung fahrzeugId={fahrzeug.id} templateId={fahrzeug.templateId} templateName={templateName} templates={templates} hatPositionen={aktivePositionen.length > 0} />
 
-      <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Soll-Bestückung</div>
+      <h2 className="secthead">Soll-Bestückung</h2>
       <SollEditor fahrzeugId={fahrzeug.id} positionen={positionen} artikel={artikel} hatTemplate={Boolean(fahrzeug.templateId)} />
 
-      <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Letzte Checks</div>
+      <h2 className="secthead">Letzte Checks</h2>
       {checks.length === 0 ? (
         <div className="card cardpad">Für dieses Fahrzeug wurde noch kein Check durchgeführt.</div>
       ) : (

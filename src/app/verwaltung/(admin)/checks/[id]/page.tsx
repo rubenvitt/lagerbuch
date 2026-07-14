@@ -53,7 +53,7 @@ export default async function CheckDetailPage({ params }: { params: Promise<{ id
 
       {check.positionen.length > 0 && (
         <>
-          <div className="cardtitle" style={{ padding: "6px 2px 8px" }}>Gezählt je Position</div>
+          <h2 className="secthead">Gezählt je Position</h2>
           {faecher.map((fach) => (
             <div key={fach}>
               <div className="fachhead">{fach}</div>
@@ -84,7 +84,7 @@ export default async function CheckDetailPage({ params }: { params: Promise<{ id
 
       {check.artikel.length > 0 && (
         <>
-          <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Abgleich je Artikel</div>
+          <h2 className="secthead">Abgleich je Artikel</h2>
           <div className="card">
             {check.artikel.map((a) => (
               <div className="row" key={a.artikelId}>

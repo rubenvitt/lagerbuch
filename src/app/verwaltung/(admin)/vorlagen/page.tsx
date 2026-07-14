@@ -10,13 +10,11 @@ export default function VorlagenPage() {
   const vorlagen = templateUebersicht(getDb());
   return (
     <>
-      <div className="mainhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="mainhead">
         <h1>Vorlagen</h1>
         <NeuTemplate />
+        <p>Bestückung einmal definieren und auf mehrere identisch gepackte Fahrzeuge übertragen. Pro Fahrzeug bleiben manuelle Abweichungen möglich.</p>
       </div>
-      <p style={{ color: "var(--stahl)", fontSize: 13.5, margin: "0 2px 14px" }}>
-        Bestückung einmal definieren und auf mehrere identisch gepackte Fahrzeuge übertragen. Pro Fahrzeug bleiben manuelle Abweichungen möglich.
-      </p>
       {vorlagen.length === 0 && <div className="card cardpad">Noch keine Vorlagen. Lege oben die erste an – oder erstelle eine Vorlage direkt aus einem gepackten Fahrzeug.</div>}
       {vorlagen.length > 0 && (
         <div className="card">

@@ -21,7 +21,7 @@ export default async function FlascheDetailPage({ params }: { params: Promise<{ 
   return (
     <>
       <Link className="backlink" href="/verwaltung/sauerstoff"><ArrowLeft size={15} /> Sauerstoff</Link>
-      <div className="mainhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="mainhead">
         <h1>
           {flasche.name}
           <span className="mono" style={{ marginLeft: 10, color: "var(--stahl)", fontSize: 15 }}>{lagerortName}</span>
@@ -42,10 +42,10 @@ export default async function FlascheDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
-      <div className="cardtitle" style={{ padding: "16px 2px 8px" }}>Messung erfassen</div>
+      <h2 className="secthead">Messung erfassen</h2>
       <MessungForm flascheId={flasche.id} />
 
-      <div className="cardtitle" style={{ padding: "18px 2px 8px" }}>Verlauf</div>
+      <h2 className="secthead">Verlauf</h2>
       {verlauf.length === 0 ? (
         <div className="card cardpad">Noch keine Messung erfasst.</div>
       ) : (

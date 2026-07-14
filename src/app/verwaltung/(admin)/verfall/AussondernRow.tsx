@@ -29,7 +29,7 @@ export function AussondernRow({ eintrag }: { eintrag: VerfallEintragView }) {
       <VerfallItem
         eintrag={eintrag}
         action={!open ? (
-          <button className="btn btn-rot" onClick={() => setOpen(true)}>
+          <button className="btn btn-rot slim" style={{ flex: "none" }} onClick={() => setOpen(true)}>
             <Trash2 size={15} /> Aussondern
           </button>
         ) : undefined}
@@ -40,10 +40,10 @@ export function AussondernRow({ eintrag }: { eintrag: VerfallEintragView }) {
             autoFocus onChange={(e) => { setKommentar(e.target.value); setErr(null); }} />
           {err && <div className="gateerr">{err}</div>}
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-rot" disabled={pending || !kommentar.trim()} onClick={submit}>
+            <button className="btn btn-rot slim" disabled={pending || !kommentar.trim()} onClick={submit}>
               {eintrag.rest}× aussondern
             </button>
-            <button className="btn btn-ghost" onClick={() => { setOpen(false); setErr(null); }}>Abbrechen</button>
+            <button className="btn btn-ghost slim" onClick={() => { setOpen(false); setErr(null); }}>Abbrechen</button>
           </div>
         </div>
       )}

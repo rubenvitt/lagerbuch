@@ -18,7 +18,7 @@ export default function VerfallPage() {
 
       {abgelaufen.length > 0 && (
         <section>
-          <div className="cardtitle" style={{ marginTop: 8 }}>Abgelaufen — aussondern nötig ({abgelaufen.length})</div>
+          <h2 className="secthead">Abgelaufen — aussondern nötig ({abgelaufen.length})</h2>
           <div className="card">
             {abgelaufen.map((e) => <AussondernRow key={e.chargeId} eintrag={e} />)}
           </div>
@@ -26,13 +26,13 @@ export default function VerfallPage() {
       )}
       {kritisch.length > 0 && (
         <section>
-          <div className="cardtitle" style={{ marginTop: 8 }}>Kritisch — läuft ab ({kritisch.length})</div>
+          <h2 className="secthead">Kritisch — läuft ab ({kritisch.length})</h2>
           <div className="card">{kritisch.map((e) => <VerfallItem key={e.chargeId} eintrag={e} />)}</div>
         </section>
       )}
       {faellig.length > 0 && (
         <section>
-          <div className="cardtitle" style={{ marginTop: 8 }}>Bald fällig ({faellig.length})</div>
+          <h2 className="secthead">Bald fällig ({faellig.length})</h2>
           <div className="card">{faellig.map((e) => <VerfallItem key={e.chargeId} eintrag={e} />)}</div>
         </section>
       )}
