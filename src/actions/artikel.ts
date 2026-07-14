@@ -30,3 +30,12 @@ export async function updateArtikel(id: string, input: z.input<typeof UpdateSche
   db.update(artikel).set(data).where(eq(artikel.id, id)).run();
   revalidatePath("/verwaltung/artikel");
 }
+
+const AktivSchema = z.object({ id: z.string().min(1), aktiv: z.boolean() });
+export async function setArtikelAktiv(input: z.input<typeof AktivSchema>, db: DB = getDb()) {
+  await requireAdmin();
+  const v = AktivSchema.parse(input);
+  db.update(artikel).set({ aktiv: v.aktiv }).where(eq(artikel.id, v.id)).run();
+  revalidatePath("/verwaltung/artikel");
+  revalidatePath("/verwaltung");
+}

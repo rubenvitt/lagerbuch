@@ -17,6 +17,7 @@ export type ArtikelZeile = {
   fach: string;
   mindestbestand: number;
   bestand: number;
+  aktiv: boolean;
   naechsteCharge: { chargenNr: string; verfall: string } | null;
 };
 
@@ -29,8 +30,10 @@ function chargenMitRest(db: DB, artikelId: string, lagerortId: string = HANDLAGE
   return chs.map((c) => ({ id: c.id, chargenNr: c.chargenNr, verfall: c.verfall, rest: rest.get(c.id) ?? 0 }));
 }
 
-export function artikelListe(db: DB): ArtikelZeile[] {
-  const arts = db.select().from(artikel).where(eq(artikel.aktiv, true)).all();
+export function artikelListe(db: DB, opts: { inklInaktiv?: boolean } = {}): ArtikelZeile[] {
+  const arts = opts.inklInaktiv
+    ? db.select().from(artikel).all()
+    : db.select().from(artikel).where(eq(artikel.aktiv, true)).all();
   return arts.map((a) => {
     const bu = db.select().from(buchungen).where(eq(buchungen.artikelId, a.id)).all();
     const chargenRest = chargenMitRest(db, a.id)
@@ -43,6 +46,7 @@ export function artikelListe(db: DB): ArtikelZeile[] {
       einheit: a.einheit,
       fach: a.fach,
       mindestbestand: a.mindestbestand,
+      aktiv: a.aktiv,
       // Verwaltungsliste zeigt den HANDLAGER-Bestand (nicht fahrzeuginklusiv).
       bestand: bestandProLagerort(bu.map((b) => ({ lagerortId: b.lagerortId, menge: b.menge })), HANDLAGER_ID),
       naechsteCharge: naechste ? { chargenNr: naechste.chargenNr, verfall: naechste.verfall } : null,

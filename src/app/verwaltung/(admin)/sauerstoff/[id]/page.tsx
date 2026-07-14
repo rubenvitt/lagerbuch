@@ -6,6 +6,7 @@ import { o2FlascheDetail } from "@/db/sauerstoff";
 import { fmtTs } from "@/lib/format";
 import { MessungForm } from "./MessungForm";
 import { FlascheAktivToggle } from "./FlascheAktivToggle";
+import { LoeschButton } from "@/components/LoeschButton";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,23 @@ export default async function FlascheDetailPage({ params }: { params: Promise<{ 
           ))}
         </div>
       )}
+
+      <div className="gefahr">
+        <div className="gtitle">Gefahrenzone</div>
+        <p>
+          Flasche endgültig löschen. Das ist nur möglich, solange keine Messung im Verlauf steht — sonst biete ich
+          stattdessen das Deaktivieren an.
+        </p>
+        <LoeschButton
+          art="o2Flasche"
+          id={flasche.id}
+          name={flasche.name}
+          typLabel="Sauerstoff-Flasche"
+          label="Flasche löschen"
+          className="btn btn-ghost-rot slim"
+          redirectTo="/verwaltung/sauerstoff"
+        />
+      </div>
     </>
   );
 }
