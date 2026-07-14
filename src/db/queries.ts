@@ -8,6 +8,7 @@ import type { Ampel } from "@/lib/domain/verfall";
 import { braucht, vorschlagsmenge } from "@/lib/domain/vorschlag";
 import { config } from "@/lib/config";
 import { chargeText } from "@/lib/format";
+import { quelleAufloeser } from "@/db/quelle";
 
 export type ChargeZeile = { id: string; chargenNr: string; verfall: string; rest: number };
 export type ArtikelZeile = {
@@ -71,6 +72,7 @@ export function artikelDetail(db: DB, id: string) {
 export function journalEintraege(db: DB, limit = 100) {
   const rows = db.select().from(buchungen).orderBy(desc(buchungen.ts)).limit(limit).all();
   const names = new Map(db.select().from(artikel).all().map((a) => [a.id, a.name]));
+  const wer = quelleAufloeser(db);
   return rows.map((b) => ({
     id: b.id,
     ts: b.ts,
@@ -78,6 +80,7 @@ export function journalEintraege(db: DB, limit = 100) {
     typ: b.typ,
     menge: b.menge,
     quelleId: b.quelleId,
+    quelleName: wer(b.quelleTyp, b.quelleId),
     kommentar: b.kommentar,
   }));
 }

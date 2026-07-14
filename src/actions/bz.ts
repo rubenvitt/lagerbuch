@@ -6,6 +6,7 @@ import { getDb, type DB } from "@/db";
 import { bzGeraete, bzKontrollen, newId } from "@/db/schema";
 import { requireAdmin } from "@/actions/session";
 import { bewerteKontrolle } from "@/lib/domain/bz";
+import { bzGeraetByBarcode } from "@/db/bz";
 
 const GeraetSchema = z.object({
   id: z.string().min(1).optional(), // gesetzt = update
@@ -56,6 +57,20 @@ export async function setGeraetAktiv(input: z.input<typeof AktivSchema>, db: DB 
   db.update(bzGeraete).set({ aktiv: v.aktiv }).where(eq(bzGeraete.id, v.id)).run();
   revalidatePath("/verwaltung/bz");
   revalidatePath(`/verwaltung/bz/${v.id}`);
+}
+
+/**
+ * Sucht ein Gerät zum gescannten Code. Nimmt neben der rohen Seriennummer auch
+ * unsere /g/[code]-Deep-Link-URLs an (falls jemand ein gedrucktes QR-Etikett scannt)
+ * und extrahiert daraus den Code.
+ */
+export async function geraetZuBarcode(rohwert: string, db: DB = getDb()): Promise<{ id: string } | null> {
+  await requireAdmin();
+  let code = rohwert.trim();
+  const deepLink = code.match(/\/g\/([^/?#]+)/);
+  if (deepLink) code = decodeURIComponent(deepLink[1]);
+  if (!code) return null;
+  return bzGeraetByBarcode(db, code);
 }
 
 const KontrolleSchema = z.object({

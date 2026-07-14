@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
 import { o2Flaschen, o2Messungen, lagerorte } from "@/db/schema";
 import { o2Status, type O2Status } from "@/lib/domain/o2";
+import { quelleAufloeser } from "@/db/quelle";
 
 export type O2FlascheZeile = {
   id: string;
@@ -58,11 +59,12 @@ export function o2FlascheDetail(db: DB, id: string): O2FlascheDetail | null {
   if (!f) return null;
   const lo = db.select().from(lagerorte).where(eq(lagerorte.id, f.lagerortId)).get();
   const rows = db.select().from(o2Messungen).where(eq(o2Messungen.flascheId, id)).orderBy(desc(o2Messungen.ts)).all();
+  const wer = quelleAufloeser(db);
   const verlauf: O2MessungZeile[] = rows.map((m) => ({
     id: m.id,
     ts: m.ts,
     druckBar: m.druckBar,
-    wer: m.quelleId,
+    wer: wer(m.quelleTyp, m.quelleId),
     kommentar: m.kommentar,
   }));
   const letzterDruck = verlauf.length > 0 ? verlauf[0].druckBar : null;
