@@ -33,4 +33,21 @@ describe("redeemToken", () => {
     const { db } = seedToken();
     expect((await redeemToken("000-000", db)).ok).toBe(false);
   });
+  it("gibt das hinterlegte Ziel zurück", async () => {
+    const db = createTestDb();
+    db.insert(tokens).values({ id: newId(), code: "700-700", label: "RTW 1", aktiv: true, createdAt: new Date(), createdBy: "a", zielTyp: "fahrzeug", zielId: "fz9" }).run();
+    const r = await redeemToken("700-700", db);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.zielTyp).toBe("fahrzeug");
+    expect(r.zielId).toBe("fz9");
+  });
+  it("liefert null-Ziel für Codes ohne Ziel", async () => {
+    const { db } = seedToken();
+    const r = await redeemToken("831-042", db);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.zielTyp).toBeNull();
+    expect(r.zielId).toBeNull();
+  });
 });

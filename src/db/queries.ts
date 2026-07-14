@@ -355,10 +355,21 @@ export function bestellvorschlag(db: DB): BestellZeile[] {
 }
 
 export function tokenListe(db: DB) {
+  const lagerNamen = new Map(db.select().from(lagerorte).all().map((l) => [l.id, l.name]));
+  const artNamen = new Map(db.select().from(artikel).all().map((a) => [a.id, a.name]));
   return db
     .select()
     .from(tokens)
     .orderBy(desc(tokens.createdAt))
     .all()
-    .map((t) => ({ id: t.id, code: t.code, label: t.label, aktiv: t.aktiv, lastUsedAt: t.lastUsedAt, createdAt: t.createdAt }));
+    .map((t) => {
+      const zielName =
+        t.zielTyp === "fahrzeug" ? lagerNamen.get(t.zielId ?? "") ?? "?"
+        : t.zielTyp === "artikel" ? artNamen.get(t.zielId ?? "") ?? "?"
+        : null;
+      return {
+        id: t.id, code: t.code, label: t.label, aktiv: t.aktiv, lastUsedAt: t.lastUsedAt, createdAt: t.createdAt,
+        zielTyp: t.zielTyp, zielId: t.zielId, zielName,
+      };
+    });
 }

@@ -16,7 +16,7 @@ export default function SauerstoffPage() {
 
   return (
     <>
-      <div className="mainhead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="mainhead">
         <h1>Sauerstoff</h1>
         <NeuFlasche lagerorte={lagerorte} />
       </div>
