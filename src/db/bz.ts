@@ -7,6 +7,7 @@ import {
   type BzAkkuKennzahl,
   type BzFaelligkeit,
 } from "@/lib/domain/bz";
+import { quelleAufloeser } from "@/db/quelle";
 
 export type BzKontrolleZeile = {
   id: string;
@@ -45,11 +46,14 @@ export type BzGeraetDetail = {
 
 export type LagerortOption = { id: string; name: string; typ: "lager" | "fahrzeug" };
 
-function toZeile(k: typeof bzKontrollen.$inferSelect): BzKontrolleZeile {
+function toZeile(
+  k: typeof bzKontrollen.$inferSelect,
+  wer: (quelleTyp: string, quelleId: string) => string,
+): BzKontrolleZeile {
   return {
     id: k.id,
     ts: k.ts,
-    wer: k.quelleId, // V1 roh (userId / Token-Code)
+    wer: wer(k.quelleTyp, k.quelleId), // aufgelöster Anzeigename (User/Token-Label)
     bestanden: k.bestanden,
     level1Wert: k.level1Wert,
     level1ImBereich: k.level1ImBereich,
@@ -108,7 +112,8 @@ export function bzGeraetDetail(db: DB, id: string, now: Date = new Date()): BzGe
   const letzte = ks[0] ?? null;
   const faelligkeit = bzFaelligkeit(letzte ? letzte.ts : null, now);
   const akku = akkuLebensdauer(ks.filter((k) => k.batterieGewechselt).map((k) => k.ts));
-  return { geraet: g, lagerortName, faelligkeit, akku, logbuch: ks.map(toZeile) };
+  const wer = quelleAufloeser(db);
+  return { geraet: g, lagerortName, faelligkeit, akku, logbuch: ks.map((k) => toZeile(k, wer)) };
 }
 
 export function bzGeraetByBarcode(db: DB, barcode: string): { id: string } | null {
@@ -118,13 +123,14 @@ export function bzGeraetByBarcode(db: DB, barcode: string): { id: string } | nul
 
 export function bzLogbuchGesamt(db: DB, limit = 100): (BzKontrolleZeile & { geraetName: string })[] {
   const namen = new Map(db.select().from(bzGeraete).all().map((g) => [g.id, g.name]));
+  const wer = quelleAufloeser(db);
   return db
     .select()
     .from(bzKontrollen)
     .orderBy(desc(bzKontrollen.ts))
     .limit(limit)
     .all()
-    .map((k) => ({ ...toZeile(k), geraetName: namen.get(k.geraetId) ?? "–" }));
+    .map((k) => ({ ...toZeile(k, wer), geraetName: namen.get(k.geraetId) ?? "–" }));
 }
 
 /** Ø Akku-Lebensdauer über ALLE Geräte: nur geräteinterne Wechsel-Intervalle, dann gemittelt. */

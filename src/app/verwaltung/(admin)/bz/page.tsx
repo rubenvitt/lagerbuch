@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, AlertTriangle } from "lucide-react";
+import { ChevronRight, AlertTriangle, ScanBarcode } from "lucide-react";
 import { getDb } from "@/db";
 import { bzGeraeteUebersicht, bzAkkuKennzahlGesamt, lagerortOptionen } from "@/db/bz";
 import { fmtTs, chipTone } from "@/lib/format";
@@ -27,7 +27,12 @@ export default function BzPage() {
     <>
       <div className="mainhead">
         <h1>BZ-Kontrolle</h1>
-        <NeuGeraet lagerorte={optionen} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link className="btn btn-tinte slim" href="/verwaltung/bz/scan" style={{ textDecoration: "none" }}>
+            <ScanBarcode size={15} /> Scannen
+          </Link>
+          <NeuGeraet lagerorte={optionen} />
+        </div>
       </div>
 
       <div className="kpis">

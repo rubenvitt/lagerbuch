@@ -41,8 +41,8 @@ export default function JournalPage() {
                       {j.menge}
                     </td>
                     <td>
-                      <span className="chip chip-grau mono" style={{ fontSize: 10.5 }}>
-                        {j.quelleId}
+                      <span className="chip chip-grau" style={{ fontSize: 10.5 }} title={j.quelleId}>
+                        {j.quelleName}
                       </span>
                     </td>
                   </tr>

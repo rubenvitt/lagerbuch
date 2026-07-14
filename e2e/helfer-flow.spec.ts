@@ -14,17 +14,18 @@ test("Code einlösen → /helfer → Entnahme → Journal zeigt quelleTyp=token"
   await page.getByRole("button", { name: /Entnahme buchen/ }).click();
   await expect(page.getByText(/Entnahme gebucht/)).toBeVisible();
 
-  // Spec §7: Journal muss die Token-Provenienz zeigen. Das Journal rendert die
-  // quelleId als Chip; für eine Token-Entnahme ist quelleId === Token-Code —
-  // genau dieser Code (statt einer OIDC-User-ID) belegt quelleTyp=token als
-  // Quelle der Buchung.
+  // Spec §7: Journal muss die Token-Provenienz zeigen. Das Journal löst die
+  // quelleId zum Anzeigenamen auf; für eine Token-Entnahme ist das das
+  // Token-Label (Seed: "E2E") — genau dieses Label (statt eines User-Namens)
+  // belegt quelleTyp=token als Quelle der Buchung; der rohe Code steht im title.
   await page.goto("/");
   await page.getByRole("button", { name: /Demo-Login/ }).click();
   await page.waitForURL("**/verwaltung");
   await page.getByRole("link", { name: "Journal" }).click();
   await expect(page.getByRole("heading", { name: "Journal" })).toBeVisible();
   const entnahmeRow = page.locator("table.tbl tbody tr", { hasText: "Entnahme" });
-  await expect(entnahmeRow.getByText(CODE)).toBeVisible();
+  await expect(entnahmeRow.getByText("E2E", { exact: true })).toBeVisible();
+  await expect(entnahmeRow.locator(`[title="${CODE}"]`)).toBeVisible();
 });
 
 test("gesperrter Token wird an der Buchung abgewiesen", async ({ page }) => {
