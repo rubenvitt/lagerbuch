@@ -1,12 +1,12 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, RotateCcw } from "lucide-react";
 import type { SollZeile } from "@/db/queries";
-import { sollPositionSetzen, sollPositionEntfernen } from "@/actions/fahrzeuge";
+import { sollPositionSetzen, sollPositionEntfernen, sollPositionWiederherstellen } from "@/actions/fahrzeuge";
 
 type Artikel = { id: string; name: string; fach: string; einheit: string };
 
-export function SollEditor({ fahrzeugId, positionen, artikel }: { fahrzeugId: string; positionen: SollZeile[]; artikel: Artikel[] }) {
+export function SollEditor({ fahrzeugId, positionen, artikel, hatTemplate = false }: { fahrzeugId: string; positionen: SollZeile[]; artikel: Artikel[]; hatTemplate?: boolean }) {
   const [pending, start] = useTransition();
   const [fach, setFach] = useState("");
   const [neuFach, setNeuFach] = useState(false); // Modus: neues Fach per Freitext anlegen
@@ -32,18 +32,34 @@ export function SollEditor({ fahrzeugId, positionen, artikel }: { fahrzeugId: st
   return (
     <div className="card">
       {positionen.length === 0 && <div className="cardpad">Kein Soll definiert – unten Positionen hinzufügen.</div>}
+      {hatTemplate && positionen.length > 0 && (
+        <div className="cardpad" style={{ fontSize: 12.5, color: "var(--stahl)", borderBottom: "1px solid var(--linie)" }}>
+          Positionen aus der Vorlage. Ändern oder Entfernen gilt nur für dieses Fahrzeug und bleibt bei einem Sync erhalten.
+        </div>
+      )}
       {faecher.map((f) => (
         <div key={f}>
           <div className="fachhead">{f}</div>
           {positionen.filter((p) => p.fachLabel === f).map((p) => (
-            <div className="row" key={p.id}>
+            <div className="row" key={p.id} style={p.entfernt ? { opacity: 0.55 } : undefined}>
               <div className="rowmain">
-                <div className="rowname">{p.artikelName}</div>
+                <div className="rowname" style={p.entfernt ? { textDecoration: "line-through" } : undefined}>
+                  {p.artikelName}
+                  {p.herkunft === "vorlage" && <span className="chip chip-grau" style={{ marginLeft: 8 }}>Vorlage</span>}
+                  {p.herkunft === "ueberschrieben" && <span className="chip chip-gelb" style={{ marginLeft: 8 }}>geändert</span>}
+                  {p.entfernt && <span className="chip chip-grau" style={{ marginLeft: 8 }}>entfernt</span>}
+                </div>
                 <div className="rowmeta"><span className="fach">{p.handlagerFach}</span><small>auf Fzg. {p.fahrzeugBestand} · Handlager {p.handlagerBestand} {p.einheit}</small></div>
               </div>
-              <input className="input" style={{ width: 64, flex: "none" }} type="number" min={1} defaultValue={p.soll}
-                onBlur={(e) => { const n = Number(e.target.value); if (n >= 1 && n !== p.soll) start(async () => { await sollPositionSetzen({ id: p.id, fahrzeugId, fachLabel: p.fachLabel, artikelId: p.artikelId, soll: n, sort: p.sort }); }); }} />
-              <button className="btn btn-ghost" style={{ flex: "none", width: "auto" }} disabled={pending} onClick={() => start(async () => { await sollPositionEntfernen({ id: p.id }); })}><Trash2 size={15} /></button>
+              {p.entfernt ? (
+                <button className="btn btn-ghost slim" style={{ flex: "none", width: "auto" }} disabled={pending} onClick={() => start(async () => { await sollPositionWiederherstellen({ id: p.id }); })}><RotateCcw size={15} /> Wiederherstellen</button>
+              ) : (
+                <>
+                  <input className="input" style={{ width: 64, flex: "none" }} type="number" min={1} defaultValue={p.soll}
+                    onBlur={(e) => { const n = Number(e.target.value); if (n >= 1 && n !== p.soll) start(async () => { await sollPositionSetzen({ id: p.id, fahrzeugId, fachLabel: p.fachLabel, artikelId: p.artikelId, soll: n, sort: p.sort }); }); }} />
+                  <button className="btn btn-ghost" style={{ flex: "none", width: "auto" }} disabled={pending} onClick={() => start(async () => { await sollPositionEntfernen({ id: p.id }); })}><Trash2 size={15} /></button>
+                </>
+              )}
             </div>
           ))}
         </div>

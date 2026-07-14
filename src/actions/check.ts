@@ -37,7 +37,8 @@ export async function checkAbschluss(input: z.input<typeof CheckSchema>, db: DB 
   let nachgefuellt = 0; // tatsächlich (nach Handlager-Kappung) umgelagerte Gesamtmenge
   let offen = 0; // nach dem Check noch fehlend (Soll − gezählt − nachgefüllt), z. B. Handlager leer
   db.transaction((tx) => {
-    const sollRows = tx.select().from(sollPositionen).where(eq(sollPositionen.fahrzeugId, v.fahrzeugId)).all();
+    // Grabsteine (entfernt) sind kein Soll → aus der gültigen Positionsmenge ausschließen.
+    const sollRows = tx.select().from(sollPositionen).where(eq(sollPositionen.fahrzeugId, v.fahrzeugId)).all().filter((s) => !s.entfernt);
     const byId = new Map(sollRows.map((s) => [s.id, s]));
     const quelle = { quelleTyp: "token" as const, quelleId: code };
     const referenz = `check:${checkId}`;
