@@ -3,7 +3,7 @@ vi.mock("@/actions/session", () => ({ requireAdmin: async () => ({ userId: "admi
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@/db/testing";
-import { lagerorte, bzGeraete, bzKontrollen, newId } from "@/db/schema";
+import { lagerorte, bzGeraete, bzKontrollen, geraete, newId } from "@/db/schema";
 import { geraetSpeichern, setGeraetAktiv, kontrolleErfassen } from "@/actions/bz";
 import {
   bzGeraeteUebersicht,
@@ -191,5 +191,13 @@ describe("bzAkkuKennzahlGesamt", () => {
     const k = bzAkkuKennzahlGesamt(db);
     expect(k.anzahlIntervalle).toBe(2);
     expect(k.tageDurchschnitt).toBeCloseTo(30, 0); // (20+40)/2, KEIN geräteübergreifendes Intervall
+  });
+});
+
+describe("Barcode-Namensraum geteilt mit generischen Geräten", () => {
+  it("lehnt ein BZ-Gerät ab, dessen Barcode bereits einem generischen Gerät gehört", async () => {
+    const { db, lo } = seed();
+    db.insert(geraete).values({ id: newId(), typ: "medizin", name: "C3", barcode: "SHARED-1", lagerortId: lo, aktiv: true, createdAt: new Date() }).run();
+    await expect(geraetSpeichern({ name: "Accu-Chek", barcode: "SHARED-1", lagerortId: lo }, db)).rejects.toThrow(/bereits/);
   });
 });

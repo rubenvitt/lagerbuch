@@ -36,6 +36,13 @@
       "when": 1784008359132,
       "tag": "0004_vehicle_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784118974649,
+      "tag": "0005_geraete",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import { bzGeraete, bzKontrollen, newId } from "@/db/schema";
 import { requireAdmin } from "@/actions/session";
 import { bewerteKontrolle } from "@/lib/domain/bz";
 import { bzGeraetByBarcode } from "@/db/bz";
+import { pruefeBarcodeFrei } from "@/db/barcode";
 
 const GeraetSchema = z.object({
   id: z.string().min(1).optional(), // gesetzt = update
@@ -27,9 +28,11 @@ const orNull = <T>(v: T | undefined): T | null => (v === undefined || v === "" ?
 export async function geraetSpeichern(input: z.input<typeof GeraetSchema>, db: DB = getDb()): Promise<{ id: string }> {
   await requireAdmin();
   const v = GeraetSchema.parse(input);
+  const barcode = orNull(v.barcode);
+  if (barcode) pruefeBarcodeFrei(db, barcode, v.id ? { tabelle: "bzGeraet", id: v.id } : null);
   const felder = {
     name: v.name,
-    barcode: orNull(v.barcode),
+    barcode,
     lagerortId: v.lagerortId,
     streifenLot: orNull(v.streifenLot),
     level1Label: orNull(v.level1Label),

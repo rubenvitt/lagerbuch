@@ -222,3 +222,33 @@ export const o2Messungen = sqliteTable(
   },
   (t) => [index("idx_o2_messungen_flasche_ts").on(t.flascheId, t.ts)],
 );
+
+// ── Geräte-Inventar (medizinische Geräte + Objekte) ─────────────────────────
+// Generisches Gerätestamm-Register neben dem BZ-spezifischen bz_geraete. Ein Gerät hängt per
+// lagerortId an genau EINEM Standort (Lager/Fahrzeug); die Zuordnung „welche Geräte gehören aufs
+// Fahrzeug" ist damit rein standort-basiert (kein Soll-/Vorlagen-Apparat wie bei Artikeln).
+// typ diskriminiert zwei Ausprägungen mit geteilten (barcode/name/anmerkung) und typ-spezifischen
+// (nullable) Feldern:
+//   medizin → mtkFaellig (Datum der nächsten Medizinprodukte-Kontrolle)
+//   objekt  → beschreibung + ablaufdatum (optional)
+export const geraete = sqliteTable(
+  "geraete",
+  {
+    id: text("id").primaryKey(),
+    typ: text("typ", { enum: ["medizin", "objekt"] }).notNull(),
+    // Barcode/Seriennummer am Gerät (Deep-Link /g/[code]). Eindeutig, aber optional bei Handanlage
+    // — daher unique + nullable (SQLite erlaubt mehrere NULL in UNIQUE).
+    barcode: text("barcode").unique(),
+    name: text("name").notNull(), // Bezeichnung
+    lagerortId: text("lagerort_id").notNull().references(() => lagerorte.id),
+    anmerkung: text("anmerkung"), // beide Typen
+    // medizin-spezifisch: nächste MTK als "YYYY-MM-DD" (tagesgenau); ok/überfällig wird berechnet.
+    mtkFaellig: text("mtk_faellig"),
+    // objekt-spezifisch:
+    beschreibung: text("beschreibung"),
+    ablaufdatum: text("ablaufdatum"), // "YYYY-MM-DD", optional
+    aktiv: integer("aktiv", { mode: "boolean" }).notNull().default(true),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [index("idx_geraete_lagerort").on(t.lagerortId)],
+);

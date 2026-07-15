@@ -16,6 +16,7 @@ import {
   bzKontrollen,
   o2Flaschen,
   o2Messungen,
+  geraete,
 } from "@/db/schema";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { requireAdmin } from "@/actions/session";
@@ -44,6 +45,7 @@ const REVALIDATE: Record<ElementArt, string[]> = {
   token: ["/verwaltung/tokens"],
   bzGeraet: ["/verwaltung/bz"],
   o2Flasche: ["/verwaltung/sauerstoff"],
+  geraet: ["/verwaltung/geraete"],
 };
 
 // ── Prüf-Logik je Art (rein, DB-lesend) ──────────────────────────────────────
@@ -67,15 +69,17 @@ function pruefeFahrzeug(db: DB, id: string): Loeschbarkeit {
   const buch = anzahl(db, buchungen, eq(buchungen.lagerortId, id));
   const soll = anzahl(db, sollPositionen, eq(sollPositionen.fahrzeugId, id));
   const chk = anzahl(db, checks, eq(checks.fahrzeugId, id));
-  const geraete = anzahl(db, bzGeraete, eq(bzGeraete.lagerortId, id));
+  const bzGer = anzahl(db, bzGeraete, eq(bzGeraete.lagerortId, id));
+  const ger = anzahl(db, geraete, eq(geraete.lagerortId, id));
   const flaschen = anzahl(db, o2Flaschen, eq(o2Flaschen.lagerortId, id));
   const codes = anzahl(db, tokens, eq(tokens.scopeLagerortId, id));
-  if (buch + soll + chk + geraete + flaschen + codes === 0) return { loeschbar: true };
+  if (buch + soll + chk + bzGer + ger + flaschen + codes === 0) return { loeschbar: true };
   const teile: string[] = [];
   if (buch) teile.push(plural(buch, "Buchung", "Buchungen"));
   if (soll) teile.push(plural(soll, "Soll-Position", "Soll-Positionen"));
   if (chk) teile.push(plural(chk, "Check", "Checks"));
-  if (geraete) teile.push(plural(geraete, "BZ-Gerät", "BZ-Geräten"));
+  if (bzGer) teile.push(plural(bzGer, "BZ-Gerät", "BZ-Geräten"));
+  if (ger) teile.push(plural(ger, "Gerät", "Geräten"));
   if (flaschen) teile.push(plural(flaschen, "O₂-Flasche", "O₂-Flaschen"));
   if (codes) teile.push(plural(codes, "Zugangs-Code", "Zugangs-Codes"));
   return { loeschbar: false, grund: verknuepftGrund(teile), kannDeaktivieren: true };
@@ -105,6 +109,26 @@ function pruefeO2Flasche(db: DB, id: string): Loeschbarkeit {
   return { loeschbar: false, grund: verknuepftGrund([plural(m, "Messung", "Messungen")]), kannDeaktivieren: true };
 }
 
+// Geräte haben kein eigenes Historien-Table, werden aber in checks.ergebnis (freies JSON, kein FK)
+// referenziert. Wurde ein Gerät je in einem Check quittiert, würde ein Hard-Delete den Namen im
+// Nachweis verlieren (Zeile bliebe „gelöschtes Gerät") → wie überall: nur Deaktivieren anbieten.
+function pruefeGeraet(db: DB, id: string): Loeschbarkeit {
+  const n = db
+    .select({ ergebnis: checks.ergebnis })
+    .from(checks)
+    .all()
+    .filter((r) => {
+      try {
+        const raw = JSON.parse(r.ergebnis ?? "[]");
+        return !Array.isArray(raw) && (raw.geraete ?? []).some((e: { geraetId?: string }) => e.geraetId === id);
+      } catch {
+        return false;
+      }
+    }).length;
+  if (n === 0) return { loeschbar: true };
+  return { loeschbar: false, grund: verknuepftGrund([plural(n, "Check", "Checks")]), kannDeaktivieren: true };
+}
+
 function pruefe(db: DB, art: ElementArt, id: string): Loeschbarkeit {
   switch (art) {
     case "artikel": return pruefeArtikel(db, id);
@@ -112,6 +136,7 @@ function pruefe(db: DB, art: ElementArt, id: string): Loeschbarkeit {
     case "token": return pruefeToken(db, id);
     case "bzGeraet": return pruefeBzGeraet(db, id);
     case "o2Flasche": return pruefeO2Flasche(db, id);
+    case "geraet": return pruefeGeraet(db, id);
   }
 }
 
@@ -140,6 +165,7 @@ export async function loescheElement(art: ElementArt, id: string, db: DB = getDb
     case "token": db.delete(tokens).where(eq(tokens.id, i)).run(); break;
     case "bzGeraet": db.delete(bzGeraete).where(eq(bzGeraete.id, i)).run(); break;
     case "o2Flasche": db.delete(o2Flaschen).where(eq(o2Flaschen.id, i)).run(); break;
+    case "geraet": db.delete(geraete).where(eq(geraete.id, i)).run(); break;
   }
   for (const p of REVALIDATE[a]) revalidatePath(p);
   return { geloescht: true };
@@ -156,6 +182,7 @@ export async function deaktiviereElement(art: ElementArt, id: string, db: DB = g
     case "token": db.update(tokens).set({ aktiv: false }).where(eq(tokens.id, i)).run(); break;
     case "bzGeraet": db.update(bzGeraete).set({ aktiv: false }).where(eq(bzGeraete.id, i)).run(); break;
     case "o2Flasche": db.update(o2Flaschen).set({ aktiv: false }).where(eq(o2Flaschen.id, i)).run(); break;
+    case "geraet": db.update(geraete).set({ aktiv: false }).where(eq(geraete.id, i)).run(); break;
   }
   for (const p of REVALIDATE[a]) revalidatePath(p);
   return { deaktiviert: true };

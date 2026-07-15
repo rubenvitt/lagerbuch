@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/actions/session", () => ({ requireHelfer: async () => ({ tokenId: "t1", code: "111-111" }) }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { createTestDb } from "@/db/testing";
-import { lagerorte, artikel, chargen, buchungen, sollPositionen, checks, newId } from "@/db/schema";
+import { lagerorte, artikel, chargen, buchungen, sollPositionen, checks, geraete, newId } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ensureHandlager, HANDLAGER_ID } from "@/db/seed-handlager";
 import { bestandProLagerort } from "@/lib/domain/bestand";
@@ -114,5 +114,57 @@ describe("checkAbschluss", () => {
     expect(bestandProLagerort(r, HANDLAGER_ID)).toBe(10);
     expect(db.select().from(buchungen).where(eq(buchungen.typ, "umlagerung")).all()).toHaveLength(0);
     expect(db.select().from(checks).all()).toHaveLength(0);
+  });
+});
+
+function seedGeraet(db: ReturnType<typeof seed>["db"], lagerortId: string, name: string, typ: "medizin" | "objekt" = "objekt") {
+  const id = newId();
+  db.insert(geraete).values({ id, typ, name, lagerortId, aktiv: true, createdAt: new Date() }).run();
+  return id;
+}
+
+describe("checkAbschluss – Geräte", () => {
+  it("quittiert Geräte und zählt auffällige (fehlt/Defekt)", async () => {
+    const { db, fz, pos } = seed();
+    const g1 = seedGeraet(db, fz, "C3", "medizin");
+    const g2 = seedGeraet(db, fz, "Spineboard");
+    const g3 = seedGeraet(db, fz, "Gurtspinne");
+    const { checkId, geraeteAuffaellig } = await checkAbschluss({
+      fahrzeugId: fz,
+      positionen: [{ sollPositionId: pos, ist: 4, nachfuellMenge: 0 }],
+      geraete: [
+        { geraetId: g1, vorhanden: true, zustand: "In Ordnung" },
+        { geraetId: g2, vorhanden: true, zustand: "Defekt", bemerkung: "Riss" },
+        { geraetId: g3, vorhanden: false },
+      ],
+    }, db);
+    expect(geraeteAuffaellig).toBe(2); // Defekt + fehlt
+    const e = erg(db, checkId);
+    expect(e.geraete).toHaveLength(3);
+    expect(e.geraete[1]).toMatchObject({ geraetId: g2, vorhanden: true, zustand: "Defekt", bemerkung: "Riss" });
+    expect(e.geraete[2]).toMatchObject({ geraetId: g3, vorhanden: false, zustand: null });
+  });
+
+  it("lehnt ein Gerät ab, das nicht an diesem Fahrzeug steht (Rollback)", async () => {
+    const { db, fz, a, pos } = seed();
+    const fremd = seedGeraet(db, HANDLAGER_ID, "fremd");
+    await expect(
+      checkAbschluss({ fahrzeugId: fz, positionen: [{ sollPositionId: pos, ist: 4, nachfuellMenge: 0 }], geraete: [{ geraetId: fremd, vorhanden: true, zustand: "In Ordnung" }] }, db),
+    ).rejects.toThrow();
+    // Rollback: keine checks-Zeile, kein Abgleich gebucht
+    expect(db.select().from(checks).all()).toHaveLength(0);
+    expect(bestandProLagerort(rows(db, a), fz)).toBe(0);
+  });
+
+  it("erlaubt Geräte-only-Check ohne Soll-Positionen", async () => {
+    const db = createTestDb();
+    ensureHandlager(db);
+    const fz = newId();
+    db.insert(lagerorte).values({ id: fz, name: "RTW", typ: "fahrzeug", aktiv: true }).run();
+    const g = seedGeraet(db, fz, "Board");
+    const { checkId } = await checkAbschluss({ fahrzeugId: fz, geraete: [{ geraetId: g, vorhanden: true, zustand: "In Ordnung" }] }, db);
+    const e = erg(db, checkId);
+    expect(e.geraete).toHaveLength(1);
+    expect(e.positionen).toHaveLength(0);
   });
 });
