@@ -105,6 +105,34 @@ export default async function CheckDetailPage({ params }: { params: Promise<{ id
           </div>
         </>
       )}
+
+      {check.geraete.length > 0 && (
+        <>
+          <h2 className="secthead">Geräte {check.summe.geraeteAuffaellig > 0 && <span className="chip chip-rot" style={{ marginLeft: 6 }}>{check.summe.geraeteAuffaellig} auffällig</span>}</h2>
+          <div className="card">
+            {check.geraete.map((g) => (
+              <div className="row" key={g.geraetId}>
+                <div className={`checkcircle ${g.vorhanden && g.zustand !== "Defekt" ? "done" : "fehl"}`}>
+                  {g.vorhanden && g.zustand !== "Defekt" ? <Check size={16} /> : <AlertTriangle size={14} />}
+                </div>
+                <div className="rowmain">
+                  <div className="rowname">{g.name}</div>
+                  <div className="rowmeta" style={{ flexWrap: "wrap" }}>
+                    {g.vorhanden ? (
+                      <span className={`chip chip-${g.zustand === "Defekt" ? "rot" : g.zustand === "Gebrauchsspuren" ? "gelb" : "ok"}`}>
+                        {g.zustand ?? "vorhanden"}
+                      </span>
+                    ) : (
+                      <span className="chip chip-rot"><AlertTriangle size={11} /> fehlt</span>
+                    )}
+                    {g.bemerkung && <small>· {g.bemerkung}</small>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </>
   );
 }

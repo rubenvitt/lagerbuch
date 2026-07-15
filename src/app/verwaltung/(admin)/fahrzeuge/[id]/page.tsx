@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { getDb } from "@/db";
 import { fahrzeugListe, sollFuerFahrzeug, artikelListe, checkHistorie, templateListeAktiv, templateDetail } from "@/db/queries";
-import { fmtTs } from "@/lib/format";
+import { geraeteFuerLagerort } from "@/db/geraete";
+import { fmtTs, geraetFaelligChip } from "@/lib/format";
 import { SollEditor } from "../SollEditor";
 import { FahrzeugAktivToggle } from "./FahrzeugAktivToggle";
 import { LoeschButton } from "@/components/LoeschButton";
@@ -23,6 +24,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
   const faecher = new Set(aktivePositionen.map((p) => p.fachLabel)).size;
   const unterSoll = aktivePositionen.filter((p) => p.fahrzeugBestand < p.soll).length;
   const checks = checkHistorie(db).filter((c) => c.fahrzeugId === id).slice(0, 8);
+  const geraete = geraeteFuerLagerort(db, id);
   // Verknüpfte Vorlage sperrt sich selbst aus der Auswahlliste aus (kein „auf sich selbst" zuweisen).
   const templates = templateListeAktiv(db).filter((t) => t.id !== fahrzeug.templateId);
   const templateName = fahrzeug.templateId ? (templateDetail(db, fahrzeug.templateId)?.name ?? null) : null;
@@ -51,6 +53,31 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
       <h2 className="secthead">Soll-Bestückung</h2>
       <SollEditor fahrzeugId={fahrzeug.id} positionen={positionen} artikel={artikel} hatTemplate={Boolean(fahrzeug.templateId)} />
 
+      <h2 className="secthead">Geräte an diesem Fahrzeug</h2>
+      {geraete.length === 0 ? (
+        <div className="card cardpad">
+          Keine Geräte hinterlegt. Unter <Link href="/verwaltung/geraete">Geräte</Link> anlegen und als Standort dieses Fahrzeug wählen.
+        </div>
+      ) : (
+        <div className="card">
+          {geraete.map((g) => {
+            const fi = geraetFaelligChip(g.typ, g.faelligkeit);
+            return (
+              <Link className="row" key={g.id} href={`/verwaltung/geraete/${g.id}`}>
+                <div className="rowmain">
+                  <div className="rowname">{g.name}</div>
+                  <div className="rowmeta">
+                    <span className="chip chip-grau">{g.typ === "medizin" ? "Medizin" : "Objekt"}</span>
+                    {fi && <span className={`chip chip-${fi.tone}`}>{fi.text}</span>}
+                  </div>
+                </div>
+                <ChevronRight size={18} style={{ color: "var(--stahl)", flex: "none" }} />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       <h2 className="secthead">Letzte Checks</h2>
       {checks.length === 0 ? (
         <div className="card cardpad">Für dieses Fahrzeug wurde noch kein Check durchgeführt.</div>
@@ -64,7 +91,8 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
                   {c.nachgefuelltGesamt > 0 && <span className="chip chip-rot">{c.nachgefuelltGesamt} nachgefüllt</span>}
                   {c.korrigiertGesamt > 0 && <span className="chip chip-gelb">{c.korrigiertGesamt} korrigiert</span>}
                   {c.offenGesamt > 0 && <span className="chip chip-rot">{c.offenGesamt} fehlt</span>}
-                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && <span className="chip chip-ok">vollständig</span>}
+                  {c.geraeteAuffaellig > 0 && <span className="chip chip-rot">{c.geraeteAuffaellig} Gerät(e) auffällig</span>}
+                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && c.geraeteAuffaellig === 0 && <span className="chip chip-ok">vollständig</span>}
                   <small>{c.positionen} Positionen</small>
                 </div>
               </div>

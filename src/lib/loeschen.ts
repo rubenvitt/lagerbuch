@@ -1,7 +1,7 @@
 // Reine Typen/Konstanten rund ums Löschen. Bewusst KEIN "use server": Server-Action-Module
 // dürfen nur async Funktionen exportieren, daher liegen Const & Typen hier.
 
-export const ELEMENT_ARTEN = ["artikel", "fahrzeug", "token", "bzGeraet", "o2Flasche"] as const;
+export const ELEMENT_ARTEN = ["artikel", "fahrzeug", "token", "bzGeraet", "o2Flasche", "geraet"] as const;
 export type ElementArt = (typeof ELEMENT_ARTEN)[number];
 
 /**

@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import type { DB } from "@/db";
-import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks, fahrzeugTemplates, templatePositionen } from "@/db/schema";
+import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks, fahrzeugTemplates, templatePositionen, geraete } from "@/db/schema";
 import { bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { verfallStatus } from "@/lib/domain/verfall";
@@ -264,7 +264,7 @@ export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
 export function checkHistorie(db: DB, limit = 50) {
   const namen = new Map(db.select().from(lagerorte).all().map((l) => [l.id, l.name]));
   return db.select().from(checks).orderBy(desc(checks.completedAt)).limit(limit).all().map((c) => {
-    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0, offenGesamt = 0;
+    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0, offenGesamt = 0, geraeteAuffaellig = 0;
     try {
       const raw = JSON.parse(c.ergebnis ?? "[]");
       if (Array.isArray(raw)) {
@@ -273,15 +273,16 @@ export function checkHistorie(db: DB, limit = 50) {
         nachgefuelltGesamt = raw.reduce((s: number, e: { gebucht?: number }) => s + (e.gebucht ?? 0), 0);
         offenGesamt = raw.reduce((s: number, e: { fehlt?: number; gebucht?: number }) => s + Math.max(0, (e.fehlt ?? 0) - (e.gebucht ?? 0)), 0);
       } else {
-        // NEUES Format: {positionen:[…], artikel:[{korrektur, nachfuellGebucht}]}.
+        // NEUES Format: {positionen:[…], artikel:[{korrektur, nachfuellGebucht}], geraete:[…]}.
         positionen = (raw.positionen ?? []).length;
         nachgefuelltGesamt = (raw.artikel ?? []).reduce((s: number, a: { nachfuellGebucht?: number }) => s + (a.nachfuellGebucht ?? 0), 0);
         korrigiertGesamt = (raw.artikel ?? []).reduce((s: number, a: { korrektur?: number }) => s + Math.abs(a.korrektur ?? 0), 0);
         // Nach dem Check noch fehlend: Soll − gezählt − nachgefüllt (z. B. Handlager war leer).
         offenGesamt = (raw.artikel ?? []).reduce((s: number, a: { sollSumme?: number; istSumme?: number; nachfuellGebucht?: number }) => s + Math.max(0, (a.sollSumme ?? 0) - (a.istSumme ?? 0) - (a.nachfuellGebucht ?? 0)), 0);
+        geraeteAuffaellig = (raw.geraete ?? []).filter((g: { vorhanden?: boolean; zustand?: string | null }) => !g.vorhanden || g.zustand === "Defekt").length;
       }
     } catch { /* ergebnis unlesbar → 0 */ }
-    return { id: c.id, fahrzeugId: c.fahrzeugId, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt, offenGesamt };
+    return { id: c.id, fahrzeugId: c.fahrzeugId, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt, offenGesamt, geraeteAuffaellig };
   });
 }
 
@@ -293,12 +294,16 @@ export type CheckArtikelDetail = {
   sollSumme: number; istSumme: number; recordedVorher: number; korrektur: number; nachfuellGebucht: number;
   offen: number; // nach dem Check noch fehlend: max(0, Soll − gezählt − nachgefüllt)
 };
+export type CheckGeraetDetail = {
+  geraetId: string; name: string; typ: "medizin" | "objekt" | null;
+  vorhanden: boolean; zustand: string | null; bemerkung: string | null;
+};
 export type CheckDetail = {
   id: string; fahrzeugId: string; fahrzeugName: string; fahrzeugKennung: string | null;
   quelleId: string; startedAt: Date; completedAt: Date | null;
-  positionen: CheckPositionDetail[]; artikel: CheckArtikelDetail[];
+  positionen: CheckPositionDetail[]; artikel: CheckArtikelDetail[]; geraete: CheckGeraetDetail[];
   altFormat: boolean; // altes ergebnis-Format ohne Positionsdetails
-  summe: { positionen: number; nachgefuellt: number; korrigiert: number; offen: number };
+  summe: { positionen: number; nachgefuellt: number; korrigiert: number; offen: number; geraeteAuffaellig: number };
 };
 
 // Detailansicht EINES abgeschlossenen Fahrzeug-Checks. Das ergebnis-JSON wird angereichert um
@@ -313,6 +318,7 @@ export function checkDetail(db: DB, id: string): CheckDetail | null {
 
   let positionen: CheckPositionDetail[] = [];
   let artikelD: CheckArtikelDetail[] = [];
+  let geraeteD: CheckGeraetDetail[] = [];
   let altFormat = false;
   try {
     const raw = JSON.parse(c.ergebnis ?? "[]");
@@ -338,20 +344,31 @@ export function checkDetail(db: DB, id: string): CheckDetail | null {
           offen: Math.max(0, sollSumme - istSumme - nachfuellGebucht),
         };
       });
+      // Geräte-Quittierung (Namen/Typ tolerant nachgeladen — inzwischen gelöschte Geräte überbrückt).
+      const gerStamm = new Map(db.select().from(geraete).all().map((g) => [g.id, g]));
+      geraeteD = (raw.geraete ?? []).map((e: { geraetId: string; vorhanden?: boolean; zustand?: string | null; bemerkung?: string | null }) => {
+        const g = gerStamm.get(e.geraetId);
+        return {
+          geraetId: e.geraetId, name: g?.name ?? "(gelöschtes Gerät)", typ: g?.typ ?? null,
+          vorhanden: Boolean(e.vorhanden), zustand: e.zustand ?? null, bemerkung: e.bemerkung ?? null,
+        };
+      });
     }
   } catch { /* ergebnis unlesbar → leere Detaillisten */ }
 
   positionen.sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.artikelName.localeCompare(y.artikelName));
+  geraeteD.sort((x, y) => x.name.localeCompare(y.name));
   const nachgefuellt = artikelD.reduce((s, a) => s + a.nachfuellGebucht, 0);
   const korrigiert = artikelD.reduce((s, a) => s + Math.abs(a.korrektur), 0);
   const offen = artikelD.reduce((s, a) => s + a.offen, 0);
+  const geraeteAuffaellig = geraeteD.filter((g) => !g.vorhanden || g.zustand === "Defekt").length;
 
   return {
     id: c.id, fahrzeugId: c.fahrzeugId,
     fahrzeugName: fahrzeug?.name ?? "–", fahrzeugKennung: fahrzeug?.kennung ?? null,
     quelleId: c.quelleId, startedAt: c.startedAt, completedAt: c.completedAt,
-    positionen, artikel: artikelD, altFormat,
-    summe: { positionen: positionen.length, nachgefuellt, korrigiert, offen },
+    positionen, artikel: artikelD, geraete: geraeteD, altFormat,
+    summe: { positionen: positionen.length, nachgefuellt, korrigiert, offen, geraeteAuffaellig },
   };
 }
 

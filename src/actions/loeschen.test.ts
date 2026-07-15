@@ -10,6 +10,8 @@ import {
   bzKontrollen,
   o2Flaschen,
   o2Messungen,
+  geraete,
+  checks,
   newId,
 } from "@/db/schema";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
@@ -141,5 +143,40 @@ describe("loeschen – BZ-Gerät & O₂-Flasche", () => {
     db.insert(o2Messungen).values({ id: newId(), flascheId: mitMessung, ts: new Date(), druckBar: 150, quelleTyp: "oidc", quelleId: "u" }).run();
     expect((await pruefeLoeschbar("o2Flasche", mitMessung, db)).loeschbar).toBe(false);
     await expect(loescheElement("o2Flasche", mitMessung, db)).rejects.toThrow();
+  });
+});
+
+describe("loeschen – Gerät", () => {
+  function mkGeraet(db: DB, lagerortId: string): string {
+    const id = newId();
+    db.insert(geraete).values({ id, typ: "objekt", name: "Spineboard", lagerortId, aktiv: true, createdAt: new Date() }).run();
+    return id;
+  }
+
+  it("löscht ein Gerät ohne Check-Historie", async () => {
+    const db = createTestDb();
+    const id = mkGeraet(db, mkFahrzeug(db));
+    expect((await pruefeLoeschbar("geraet", id, db)).loeschbar).toBe(true);
+    await loescheElement("geraet", id, db);
+    expect(db.select().from(geraete).where(eq(geraete.id, id)).get()).toBeUndefined();
+  });
+
+  it("sperrt das Löschen, wenn das Gerät in einem Check quittiert wurde", async () => {
+    const db = createTestDb();
+    const fz = mkFahrzeug(db);
+    const id = mkGeraet(db, fz);
+    db.insert(checks).values({
+      id: newId(), fahrzeugId: fz, quelleTyp: "token", quelleId: "111-111", startedAt: new Date(), completedAt: new Date(),
+      ergebnis: JSON.stringify({ positionen: [], artikel: [], geraete: [{ geraetId: id, vorhanden: false, zustand: null, bemerkung: null }] }),
+    }).run();
+    const status = await pruefeLoeschbar("geraet", id, db);
+    expect(status.loeschbar).toBe(false);
+    if (!status.loeschbar) {
+      expect(status.grund).toContain("Check");
+      expect(status.kannDeaktivieren).toBe(true);
+    }
+    await expect(loescheElement("geraet", id, db)).rejects.toThrow();
+    await deaktiviereElement("geraet", id, db);
+    expect(db.select().from(geraete).where(eq(geraete.id, id)).get()!.aktiv).toBe(false);
   });
 });

@@ -21,7 +21,7 @@
 import { eq } from "drizzle-orm";
 import { applyMigrations, getDb, type DB } from "@/db";
 import { ensureHandlager, HANDLAGER_ID } from "@/db/seed-handlager";
-import { artikel, buchungen, chargen, lagerorte, newId, sollPositionen, tokens } from "@/db/schema";
+import { artikel, buchungen, chargen, geraete, lagerorte, newId, sollPositionen, tokens } from "@/db/schema";
 import { assertProductionSecrets, config } from "@/lib/config";
 
 // Aktiver Token mit bekanntem Code + Artikel mit Bestand > 0, für
@@ -109,6 +109,33 @@ function ensureE2eCheckFixtures(db: DB): void {
     .run();
 }
 
+// Eigenes Fahrzeug (getrennt von e2e-fahrzeug, damit e2e/check.spec.ts KEINEN
+// Geräte-Schritt bekommt) + Token + Soll-Position + ein Objekt-Gerät am Standort,
+// für e2e/geraete.spec.ts (Fahrzeugcheck mit Geräte-Quittierung). Idempotent.
+const E2E_GERAETE_TOKEN_CODE = "333-333";
+
+function ensureE2eGeraeteFixtures(db: DB): void {
+  db.insert(tokens)
+    .values({ id: "e2e-geraete-token", code: E2E_GERAETE_TOKEN_CODE, label: "E2E Geräte", aktiv: true, createdAt: new Date(), createdBy: "e2e" })
+    .onConflictDoNothing()
+    .run();
+
+  db.insert(lagerorte)
+    .values({ id: "e2e-geraete-fahrzeug", name: "E2E Geräte RTW", typ: "fahrzeug", kennung: null, aktiv: true })
+    .onConflictDoNothing()
+    .run();
+
+  db.insert(sollPositionen)
+    .values({ id: "e2e-geraete-soll", fahrzeugId: "e2e-geraete-fahrzeug", fachLabel: "E2E Fach", sort: 0, artikelId: "e2e-artikel", soll: 2 })
+    .onConflictDoNothing()
+    .run();
+
+  db.insert(geraete)
+    .values({ id: "e2e-geraet", typ: "objekt", name: "E2E Spineboard", lagerortId: "e2e-geraete-fahrzeug", aktiv: true, createdAt: new Date() })
+    .onConflictDoNothing()
+    .run();
+}
+
 // Artikel unter Mindestbestand (bestand 0 < mindestbestand 5, keine
 // Buchung/Charge), für e2e/inventur.spec.ts (Bestellvorschlag-Liste ist
 // sonst leer). Idempotent, analog zu ensureE2eVerfallFixtures.
@@ -125,5 +152,6 @@ ensureHandlager(getDb());
 ensureE2eHelferFixtures(getDb());
 ensureE2eVerfallFixtures(getDb());
 ensureE2eCheckFixtures(getDb());
+ensureE2eGeraeteFixtures(getDb());
 ensureE2eBestellungFixtures(getDb());
 console.log(`[e2e] migrated + seeded ${config.databasePath}`);
