@@ -23,6 +23,44 @@ export type ArtikelRow = {
   naechsteAblaufText: string | null;
 };
 
+type SortKey = "name-asc" | "name-desc" | "fach" | "bestand-asc" | "bestand-desc" | "verfall";
+
+const SORT_OPTIONEN: { wert: SortKey; label: string }[] = [
+  { wert: "name-asc", label: "Name A–Z" },
+  { wert: "name-desc", label: "Name Z–A" },
+  { wert: "fach", label: "Fach" },
+  { wert: "bestand-asc", label: "Bestand aufsteigend" },
+  { wert: "bestand-desc", label: "Bestand absteigend" },
+  { wert: "verfall", label: "Nächster Verfall" },
+];
+
+/** Vergleichsfunktionen je Sortierung; Zweitkriterium ist stets der Name (stabile, erwartbare Reihenfolge). */
+function vergleiche(sort: SortKey): (a: ArtikelRow, b: ArtikelRow) => number {
+  const nachName = (a: ArtikelRow, b: ArtikelRow) => a.name.localeCompare(b.name, "de");
+  switch (sort) {
+    case "name-desc":
+      return (a, b) => b.name.localeCompare(a.name, "de");
+    case "fach":
+      return (a, b) => a.fach.localeCompare(b.fach, "de") || nachName(a, b);
+    case "bestand-asc":
+      return (a, b) => a.bestand - b.bestand || nachName(a, b);
+    case "bestand-desc":
+      return (a, b) => b.bestand - a.bestand || nachName(a, b);
+    case "verfall":
+      // Artikel ohne Charge ans Ende, sonst frühester Verfall zuerst.
+      return (a, b) => {
+        const av = a.naechsteCharge?.verfall ?? "";
+        const bv = b.naechsteCharge?.verfall ?? "";
+        if (!av && !bv) return nachName(a, b);
+        if (!av) return 1;
+        if (!bv) return -1;
+        return av.localeCompare(bv) || nachName(a, b);
+      };
+    default:
+      return nachName;
+  }
+}
+
 function StatusChips({ row }: { row: ArtikelRow }) {
   if (!row.aktiv) {
     return <span className="chip chip-grau">inaktiv</span>;
@@ -51,17 +89,20 @@ export function ArtikelTable({ rows }: { rows: ArtikelRow[] }) {
   const [nurUnterMindest, setNurUnterMindest] = useState(false);
   const [nurCharge, setNurCharge] = useState(false);
   const [ohneInaktive, setOhneInaktive] = useState(false);
+  const [sort, setSort] = useState<SortKey>("name-asc");
 
   const gefiltert = useMemo(() => {
     const q = suche.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (ohneInaktive && !r.aktiv) return false;
-      if (nurUnterMindest && !r.unterMindest) return false;
-      if (nurCharge && !r.naechsteAblaufText) return false;
-      if (q && !`${r.name} ${r.fach} ${r.naechsteCharge?.chargenNr ?? ""}`.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [rows, suche, nurUnterMindest, nurCharge, ohneInaktive]);
+    return rows
+      .filter((r) => {
+        if (ohneInaktive && !r.aktiv) return false;
+        if (nurUnterMindest && !r.unterMindest) return false;
+        if (nurCharge && !r.naechsteAblaufText) return false;
+        if (q && !`${r.name} ${r.fach} ${r.naechsteCharge?.chargenNr ?? ""}`.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort(vergleiche(sort));
+  }, [rows, suche, nurUnterMindest, nurCharge, ohneInaktive, sort]);
 
   const chips: FilterChip[] = [
     { label: "unter Mindestbestand", aktiv: nurUnterMindest, onToggle: () => setNurUnterMindest((v) => !v) },
@@ -87,6 +128,25 @@ export function ArtikelTable({ rows }: { rows: ArtikelRow[] }) {
         onSuche={setSuche}
         platzhalter="Artikel oder Fach suchen…"
         chips={chips}
+        extra={
+          <label className="sortfeld" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span className="label" style={{ margin: 0 }}>Sortierung</span>
+            <select
+              className="input"
+              name="sortierung"
+              style={{ width: "auto" }}
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              aria-label="Sortierung"
+            >
+              {SORT_OPTIONEN.map((o) => (
+                <option key={o.wert} value={o.wert}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
         treffer={{ gezeigt: gefiltert.length, gesamt: rows.length }}
       />
       <div className="card">
