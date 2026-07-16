@@ -1,22 +1,40 @@
 import { getDb } from "@/db";
-import { journalEintraege } from "@/db/queries";
-import { fmtTs, typLabel } from "@/lib/format";
+import { journalEintraege, type BuchungTyp } from "@/db/queries";
+import { fmtTs, parseDatumGrenze, typLabel } from "@/lib/format";
+import { JournalFilter } from "./JournalFilter";
 
 export const dynamic = "force-dynamic";
 
-export default function JournalPage() {
-  const db = getDb();
-  const journal = journalEintraege(db);
+const TYPEN: BuchungTyp[] = ["zugang", "entnahme", "korrektur", "umlagerung"];
+
+export default async function JournalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; typ?: string; von?: string; bis?: string }>;
+}) {
+  const sp = await searchParams;
+  const q = sp.q?.trim() ?? "";
+  const typ = TYPEN.includes(sp.typ as BuchungTyp) ? (sp.typ as BuchungTyp) : undefined;
+  const von = sp.von ?? "";
+  const bis = sp.bis ?? "";
+
+  const journal = journalEintraege(getDb(), {
+    q: q || undefined,
+    typ,
+    von: parseDatumGrenze(von, false),
+    bis: parseDatumGrenze(bis, true),
+  });
 
   return (
     <>
       <div className="mainhead">
         <h1>Journal</h1>
-        <p>Append-only Buchungsjournal – Bestand ist immer die Summe der Buchungen.</p>
+        <p>Append-only Buchungsjournal – Bestand ist immer die Summe der Buchungen. Zeigt die neuesten 100 Treffer.</p>
       </div>
+      <JournalFilter q={q} typ={typ ?? ""} von={von} bis={bis} />
       <div className="card" style={{ overflowX: "auto" }}>
         {journal.length === 0 ? (
-          <div className="empty">Noch keine Buchungen.</div>
+          <div className="empty">Keine Buchung gefunden.</div>
         ) : (
           <table className="tbl">
             <thead>

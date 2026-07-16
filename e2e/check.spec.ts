@@ -31,5 +31,7 @@ test("Helfer-Check bucht Fehlmenge mit referenz=check und erscheint in der Histo
   await page.getByRole("button", { name: "Demo-Login (nur Entwicklung)" }).click();
   await page.waitForURL("**/verwaltung");
   await page.goto("/verwaltung/checks");
-  await expect(page.getByText("E2E RTW").first()).toBeVisible();
+  // Check-Zeile ist ein Link; gezielt darauf prüfen (die Fahrzeug-Filter-Dropdownliste enthält
+  // denselben Namen als verstecktes <option>, daher nicht per getByText matchen).
+  await expect(page.getByRole("link", { name: /E2E RTW/ })).toBeVisible();
 });

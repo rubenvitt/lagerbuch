@@ -14,6 +14,17 @@ export function fmtTs(ts: Date): string {
   return `${pad2(ts.getDate())}.${pad2(ts.getMonth() + 1)}. ${pad2(ts.getHours())}:${pad2(ts.getMinutes())}`;
 }
 
+/**
+ * "YYYY-MM-DD" (aus einem <input type="date">) → lokaler Tagesanfang (ende=false) bzw. Tagesende
+ * (ende=true). undefined bei leerem/ungültigem Wert. Für inklusive Zeitraum-Filter auf Timestamps.
+ */
+export function parseDatumGrenze(s: string | undefined, ende: boolean): Date | undefined {
+  if (!s) return undefined;
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return undefined;
+  return ende ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
 /** Chip wording for a charge's verfall status, matching the mockup's tone→text mapping. */
 export function chargeText(status: { ampel: Ampel; abgelaufen: boolean }, verfall: string): string {
   if (status.abgelaufen) return "abgelaufen";

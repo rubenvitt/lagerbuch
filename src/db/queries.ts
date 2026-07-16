@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import type { DB } from "@/db";
 import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks, fahrzeugTemplates, templatePositionen, geraete } from "@/db/schema";
 import { bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
@@ -69,9 +69,45 @@ export function artikelDetail(db: DB, id: string) {
   };
 }
 
-export function journalEintraege(db: DB, limit = 100) {
-  const rows = db.select().from(buchungen).orderBy(desc(buchungen.ts)).limit(limit).all();
-  const names = new Map(db.select().from(artikel).all().map((a) => [a.id, a.name]));
+export type BuchungTyp = (typeof buchungen.$inferSelect)["typ"];
+export type JournalFilterOpts = {
+  limit?: number;
+  q?: string; // Freitext über Artikelname + Kommentar
+  typ?: BuchungTyp;
+  von?: Date; // inklusive untere Zeitgrenze
+  bis?: Date; // inklusive obere Zeitgrenze (Aufrufer setzt ggf. Tagesende)
+};
+
+// Buchungsjournal mit optionalen Filtern. Wichtig: die WHERE-Bedingungen greifen VOR dem Limit,
+// damit die Suche über die gesamte Historie geht (nicht nur im geladenen Limit-Fenster). Der
+// Artikelname ist ein Join (buchungen.artikelId → artikel.name), daher werden passende Artikel-IDs
+// vorab im (kleinen) Artikelstamm aufgelöst und mit einer Kommentar-Suche ODER-verknüpft.
+export function journalEintraege(db: DB, opts: JournalFilterOpts = {}) {
+  const { limit = 100, q, typ, von, bis } = opts;
+  const alleArtikel = db.select().from(artikel).all();
+  const names = new Map(alleArtikel.map((a) => [a.id, a.name]));
+
+  const conds: SQL[] = [];
+  if (typ) conds.push(eq(buchungen.typ, typ));
+  if (von) conds.push(gte(buchungen.ts, von));
+  if (bis) conds.push(lte(buchungen.ts, bis));
+  const term = q?.trim();
+  if (term) {
+    const treffer = alleArtikel.filter((a) => a.name.toLowerCase().includes(term.toLowerCase())).map((a) => a.id);
+    // LIKE-Sonderzeichen (%, _, \) wörtlich behandeln, sonst matcht z. B. "5%" jeden Kommentar mit "5".
+    const escaped = term.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const textConds: SQL[] = [sql`${buchungen.kommentar} LIKE ${`%${escaped}%`} ESCAPE '\\'`];
+    if (treffer.length > 0) textConds.push(inArray(buchungen.artikelId, treffer));
+    conds.push(or(...textConds)!);
+  }
+
+  const rows = db
+    .select()
+    .from(buchungen)
+    .where(conds.length > 0 ? and(...conds) : undefined)
+    .orderBy(desc(buchungen.ts))
+    .limit(limit)
+    .all();
   const wer = quelleAufloeser(db);
   return rows.map((b) => ({
     id: b.id,
@@ -261,9 +297,28 @@ export function sollFuerFahrzeug(db: DB, fahrzeugId: string): SollZeile[] {
     .sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.sort - y.sort);
 }
 
-export function checkHistorie(db: DB, limit = 50) {
+export type CheckFilter = {
+  limit?: number;
+  fahrzeugId?: string;
+  von?: Date; // inklusive untere Zeitgrenze (completedAt)
+  bis?: Date; // inklusive obere Zeitgrenze (completedAt)
+};
+
+export function checkHistorie(db: DB, opts: CheckFilter = {}) {
+  const { limit = 50, fahrzeugId, von, bis } = opts;
   const namen = new Map(db.select().from(lagerorte).all().map((l) => [l.id, l.name]));
-  return db.select().from(checks).orderBy(desc(checks.completedAt)).limit(limit).all().map((c) => {
+  const conds: SQL[] = [];
+  if (fahrzeugId) conds.push(eq(checks.fahrzeugId, fahrzeugId));
+  if (von) conds.push(gte(checks.completedAt, von));
+  if (bis) conds.push(lte(checks.completedAt, bis));
+  return db
+    .select()
+    .from(checks)
+    .where(conds.length > 0 ? and(...conds) : undefined)
+    .orderBy(desc(checks.completedAt))
+    .limit(limit)
+    .all()
+    .map((c) => {
     let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0, offenGesamt = 0, geraeteAuffaellig = 0;
     try {
       const raw = JSON.parse(c.ergebnis ?? "[]");

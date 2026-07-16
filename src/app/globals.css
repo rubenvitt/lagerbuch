@@ -78,6 +78,13 @@ input, select { font: inherit; }
 .filter.on{border-color:var(--tinte);color:var(--tinte)}
 .filters{display:flex;gap:7px;margin:0 2px 12px;flex-wrap:wrap}
 .input{width:100%;border:1.5px solid var(--linie);border-radius:10px;padding:10px 12px;font:500 14px var(--body);background:#fff;color:var(--tinte)}
+/* Such-/Filter-Leiste: Suchfeld + Filter-Chips oberhalb einer Liste/Tabelle */
+.filterleiste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.filterleiste .filters{margin:0}
+.suchfeld{position:relative;display:flex;align-items:center;flex:1 1 240px;min-width:0}
+.suchfeld>svg{position:absolute;left:11px;color:var(--stahl);pointer-events:none}
+.suchfeld .input{padding-left:34px}
+.filtertreffer{font-size:12px;font-weight:600;color:var(--stahl);white-space:nowrap;margin-left:auto}
 .label{font:600 11.5px var(--display);letter-spacing:.09em;text-transform:uppercase;color:var(--stahl);margin:0 0 5px;display:block}
 .footnote{font-family:var(--mono);font-size:10.5px;color:var(--stahl);margin:12px 4px 0;line-height:1.6}
 .empty{padding:24px 18px;text-align:center;color:var(--stahl);font-size:13.5px;line-height:1.55}
@@ -162,7 +169,7 @@ input, select { font: inherit; }
 .sitem .cnt{margin-left:auto;background:var(--rot);color:#fff;font-size:10.5px;font-weight:700;border-radius:99px;min-width:18px;height:18px;display:flex;align-items:center;justify-content:center;padding:0 5px}
 .main{flex:1;min-width:0;padding:20px 24px 48px;overflow-y:auto;height:100vh}
 /* Lange Zeilen lesen sich auf breiten Monitoren schlecht – Inhalt deckeln, Overlays (fixed) nicht */
-.main>.mainhead,.main>.backlink,.main>.kpis,.main>.secthead,.main>.card,.main>section,.main>.gefahr,.main>.filters,.main>.footnote,.main>p{max-width:1100px}
+.main>.mainhead,.main>.backlink,.main>.kpis,.main>.secthead,.main>.card,.main>section,.main>.gefahr,.main>.filters,.main>.filterleiste,.main>.footnote,.main>p{max-width:1100px}
 /* Verwaltung ist Maus/Desktop-UI: dichter als die Helfer-Touch-App */
 .main .row{padding:9px 12px}
 .main .cardpad{padding:11px 12px}
