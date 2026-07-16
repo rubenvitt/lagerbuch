@@ -76,6 +76,28 @@ export function o2FlascheDetail(db: DB, id: string): O2FlascheDetail | null {
   };
 }
 
+export type O2FlascheCheckZeile = { id: string; name: string; nennfuelldruckBar: number; letzterDruck: number | null };
+
+/** Aktive Flaschen an einem Standort — für den Fahrzeugcheck & die Fahrzeug-Detailseite. */
+export function o2FlaschenFuerLagerort(db: DB, lagerortId: string): O2FlascheCheckZeile[] {
+  const flaschen = db.select().from(o2Flaschen).where(eq(o2Flaschen.lagerortId, lagerortId)).all().filter((f) => f.aktiv);
+  const messungen = db.select().from(o2Messungen).all();
+  // Jüngste Messung je Flasche als Vorschlagswert (aktueller Druck = letzte Messung).
+  const letzteProFlasche = new Map<string, { ts: Date; druckBar: number }>();
+  for (const m of messungen) {
+    const prev = letzteProFlasche.get(m.flascheId);
+    if (!prev || m.ts > prev.ts) letzteProFlasche.set(m.flascheId, { ts: m.ts, druckBar: m.druckBar });
+  }
+  return flaschen
+    .map((f) => ({
+      id: f.id,
+      name: f.name,
+      nennfuelldruckBar: f.nennfuelldruckBar,
+      letzterDruck: letzteProFlasche.get(f.id)?.druckBar ?? null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Aktive Lagerorte für das Flaschen-Anlegen-Dropdown. */
 export function lagerorteFuerFlaschen(db: DB): { id: string; name: string }[] {
   return db

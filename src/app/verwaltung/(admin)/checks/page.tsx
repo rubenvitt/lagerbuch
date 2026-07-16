@@ -45,7 +45,8 @@ export default async function ChecksPage({
                   {c.korrigiertGesamt > 0 && <span className="chip chip-gelb">{c.korrigiertGesamt} korrigiert</span>}
                   {c.offenGesamt > 0 && <span className="chip chip-rot">{c.offenGesamt} fehlt weiterhin</span>}
                   {c.geraeteAuffaellig > 0 && <span className="chip chip-rot">{c.geraeteAuffaellig} Gerät(e) auffällig</span>}
-                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && c.geraeteAuffaellig === 0 && <span className="chip chip-ok">vollständig</span>}
+                  {c.flaschenAuffaellig > 0 && <span className="chip chip-rot">{c.flaschenAuffaellig} Flasche(n) niedrig</span>}
+                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && c.geraeteAuffaellig === 0 && c.flaschenAuffaellig === 0 && <span className="chip chip-ok">vollständig</span>}
                 </div>
               </div>
               <div className="bignum" style={{ fontSize: 18 }}>{c.positionen}<small>Pos.</small></div>

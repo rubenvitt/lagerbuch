@@ -1,10 +1,11 @@
 import { and, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import type { DB } from "@/db";
-import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks, fahrzeugTemplates, templatePositionen, geraete } from "@/db/schema";
+import { artikel, buchungen, chargen, tokens, lagerorte, sollPositionen, checks, fahrzeugTemplates, templatePositionen, geraete, o2Flaschen } from "@/db/schema";
 import { bestandProCharge, bestandProLagerort, bestandProLagerortUndCharge } from "@/lib/domain/bestand";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { verfallStatus } from "@/lib/domain/verfall";
 import type { Ampel } from "@/lib/domain/verfall";
+import { o2Status } from "@/lib/domain/o2";
 import { braucht, vorschlagsmenge } from "@/lib/domain/vorschlag";
 import { config } from "@/lib/config";
 import { chargeText } from "@/lib/format";
@@ -319,7 +320,7 @@ export function checkHistorie(db: DB, opts: CheckFilter = {}) {
     .limit(limit)
     .all()
     .map((c) => {
-    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0, offenGesamt = 0, geraeteAuffaellig = 0;
+    let positionen = 0, nachgefuelltGesamt = 0, korrigiertGesamt = 0, offenGesamt = 0, geraeteAuffaellig = 0, flaschenAuffaellig = 0;
     try {
       const raw = JSON.parse(c.ergebnis ?? "[]");
       if (Array.isArray(raw)) {
@@ -328,16 +329,17 @@ export function checkHistorie(db: DB, opts: CheckFilter = {}) {
         nachgefuelltGesamt = raw.reduce((s: number, e: { gebucht?: number }) => s + (e.gebucht ?? 0), 0);
         offenGesamt = raw.reduce((s: number, e: { fehlt?: number; gebucht?: number }) => s + Math.max(0, (e.fehlt ?? 0) - (e.gebucht ?? 0)), 0);
       } else {
-        // NEUES Format: {positionen:[…], artikel:[{korrektur, nachfuellGebucht}], geraete:[…]}.
+        // NEUES Format: {positionen:[…], artikel:[{korrektur, nachfuellGebucht}], geraete:[…], flaschen:[…]}.
         positionen = (raw.positionen ?? []).length;
         nachgefuelltGesamt = (raw.artikel ?? []).reduce((s: number, a: { nachfuellGebucht?: number }) => s + (a.nachfuellGebucht ?? 0), 0);
         korrigiertGesamt = (raw.artikel ?? []).reduce((s: number, a: { korrektur?: number }) => s + Math.abs(a.korrektur ?? 0), 0);
         // Nach dem Check noch fehlend: Soll − gezählt − nachgefüllt (z. B. Handlager war leer).
         offenGesamt = (raw.artikel ?? []).reduce((s: number, a: { sollSumme?: number; istSumme?: number; nachfuellGebucht?: number }) => s + Math.max(0, (a.sollSumme ?? 0) - (a.istSumme ?? 0) - (a.nachfuellGebucht ?? 0)), 0);
         geraeteAuffaellig = (raw.geraete ?? []).filter((g: { vorhanden?: boolean; zustand?: string | null }) => !g.vorhanden || g.zustand === "Defekt").length;
+        flaschenAuffaellig = (raw.flaschen ?? []).filter((f: { druckBar?: number; nennfuelldruckBar?: number }) => o2Status(f.druckBar ?? 0, f.nennfuelldruckBar ?? 200).niedrig).length;
       }
     } catch { /* ergebnis unlesbar → 0 */ }
-    return { id: c.id, fahrzeugId: c.fahrzeugId, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt, offenGesamt, geraeteAuffaellig };
+    return { id: c.id, fahrzeugId: c.fahrzeugId, fahrzeugName: namen.get(c.fahrzeugId) ?? "–", completedAt: c.completedAt, positionen, nachgefuelltGesamt, korrigiertGesamt, offenGesamt, geraeteAuffaellig, flaschenAuffaellig };
   });
 }
 
@@ -353,12 +355,16 @@ export type CheckGeraetDetail = {
   geraetId: string; name: string; typ: "medizin" | "objekt" | null;
   vorhanden: boolean; zustand: string | null; bemerkung: string | null;
 };
+export type CheckFlascheDetail = {
+  flascheId: string; name: string; druckBar: number; nennfuelldruckBar: number;
+  prozent: number; ampel: Ampel; niedrig: boolean;
+};
 export type CheckDetail = {
   id: string; fahrzeugId: string; fahrzeugName: string; fahrzeugKennung: string | null;
   quelleId: string; startedAt: Date; completedAt: Date | null;
-  positionen: CheckPositionDetail[]; artikel: CheckArtikelDetail[]; geraete: CheckGeraetDetail[];
+  positionen: CheckPositionDetail[]; artikel: CheckArtikelDetail[]; geraete: CheckGeraetDetail[]; flaschen: CheckFlascheDetail[];
   altFormat: boolean; // altes ergebnis-Format ohne Positionsdetails
-  summe: { positionen: number; nachgefuellt: number; korrigiert: number; offen: number; geraeteAuffaellig: number };
+  summe: { positionen: number; nachgefuellt: number; korrigiert: number; offen: number; geraeteAuffaellig: number; flaschenAuffaellig: number };
 };
 
 // Detailansicht EINES abgeschlossenen Fahrzeug-Checks. Das ergebnis-JSON wird angereichert um
@@ -374,6 +380,7 @@ export function checkDetail(db: DB, id: string): CheckDetail | null {
   let positionen: CheckPositionDetail[] = [];
   let artikelD: CheckArtikelDetail[] = [];
   let geraeteD: CheckGeraetDetail[] = [];
+  let flaschenD: CheckFlascheDetail[] = [];
   let altFormat = false;
   try {
     const raw = JSON.parse(c.ergebnis ?? "[]");
@@ -408,22 +415,36 @@ export function checkDetail(db: DB, id: string): CheckDetail | null {
           vorhanden: Boolean(e.vorhanden), zustand: e.zustand ?? null, bemerkung: e.bemerkung ?? null,
         };
       });
+      // Sauerstoffflaschen (Name tolerant nachgeladen; Füllstand aus Druck + Nennfülldruck-Snapshot).
+      const flaschenStamm = new Map(db.select().from(o2Flaschen).all().map((f) => [f.id, f]));
+      flaschenD = (raw.flaschen ?? []).map((e: { flascheId: string; druckBar?: number; nennfuelldruckBar?: number }) => {
+        const f = flaschenStamm.get(e.flascheId);
+        const druckBar = e.druckBar ?? 0;
+        const nennfuelldruckBar = e.nennfuelldruckBar ?? f?.nennfuelldruckBar ?? 200;
+        const status = o2Status(druckBar, nennfuelldruckBar);
+        return {
+          flascheId: e.flascheId, name: f?.name ?? "(gelöschte Flasche)", druckBar, nennfuelldruckBar,
+          prozent: status.prozent, ampel: status.ampel, niedrig: status.niedrig,
+        };
+      });
     }
   } catch { /* ergebnis unlesbar → leere Detaillisten */ }
 
   positionen.sort((x, y) => x.fachLabel.localeCompare(y.fachLabel) || x.artikelName.localeCompare(y.artikelName));
   geraeteD.sort((x, y) => x.name.localeCompare(y.name));
+  flaschenD.sort((x, y) => x.name.localeCompare(y.name));
   const nachgefuellt = artikelD.reduce((s, a) => s + a.nachfuellGebucht, 0);
   const korrigiert = artikelD.reduce((s, a) => s + Math.abs(a.korrektur), 0);
   const offen = artikelD.reduce((s, a) => s + a.offen, 0);
   const geraeteAuffaellig = geraeteD.filter((g) => !g.vorhanden || g.zustand === "Defekt").length;
+  const flaschenAuffaellig = flaschenD.filter((f) => f.niedrig).length;
 
   return {
     id: c.id, fahrzeugId: c.fahrzeugId,
     fahrzeugName: fahrzeug?.name ?? "–", fahrzeugKennung: fahrzeug?.kennung ?? null,
     quelleId: c.quelleId, startedAt: c.startedAt, completedAt: c.completedAt,
-    positionen, artikel: artikelD, geraete: geraeteD, altFormat,
-    summe: { positionen: positionen.length, nachgefuellt, korrigiert, offen, geraeteAuffaellig },
+    positionen, artikel: artikelD, geraete: geraeteD, flaschen: flaschenD, altFormat,
+    summe: { positionen: positionen.length, nachgefuellt, korrigiert, offen, geraeteAuffaellig, flaschenAuffaellig },
   };
 }
 

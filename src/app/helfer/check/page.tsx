@@ -1,6 +1,7 @@
 import { getDb } from "@/db";
 import { fahrzeugListe, sollFuerFahrzeug } from "@/db/queries";
 import { geraeteFuerLagerort } from "@/db/geraete";
+import { o2FlaschenFuerLagerort } from "@/db/sauerstoff";
 import { CheckFlow } from "./CheckFlow";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,8 @@ export default async function HelferCheckPage({ searchParams }: { searchParams: 
   const geraete = Object.fromEntries(
     fahrzeuge.map((f) => [f.id, geraeteFuerLagerort(db, f.id).map((g) => ({ id: g.id, typ: g.typ, name: g.name }))]),
   );
+  // Sauerstoffflaschen am Fahrzeug (standort-basiert) → Druck-Ablese-Schritt im Check.
+  const flaschen = Object.fromEntries(fahrzeuge.map((f) => [f.id, o2FlaschenFuerLagerort(db, f.id)]));
   // Code mit Fahrzeug-Ziel (?fz=…) springt direkt in dessen Check; nur gültige, aktive IDs zählen.
   const preselect = fz && fahrzeuge.some((f) => f.id === fz) ? fz : null;
   return (
@@ -22,6 +25,7 @@ export default async function HelferCheckPage({ searchParams }: { searchParams: 
       fahrzeuge={fahrzeuge.map((f) => ({ id: f.id, name: f.name, kennung: f.kennung }))}
       soll={soll}
       geraete={geraete}
+      flaschen={flaschen}
       preselect={preselect}
     />
   );

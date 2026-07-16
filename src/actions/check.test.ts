@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/actions/session", () => ({ requireHelfer: async () => ({ tokenId: "t1", code: "111-111" }) }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 import { createTestDb } from "@/db/testing";
-import { lagerorte, artikel, chargen, buchungen, sollPositionen, checks, geraete, newId } from "@/db/schema";
+import { lagerorte, artikel, chargen, buchungen, sollPositionen, checks, geraete, o2Flaschen, o2Messungen, newId } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ensureHandlager, HANDLAGER_ID } from "@/db/seed-handlager";
 import { bestandProLagerort } from "@/lib/domain/bestand";
@@ -166,5 +166,64 @@ describe("checkAbschluss – Geräte", () => {
     const e = erg(db, checkId);
     expect(e.geraete).toHaveLength(1);
     expect(e.positionen).toHaveLength(0);
+  });
+});
+
+function seedFlasche(db: ReturnType<typeof seed>["db"], lagerortId: string, name: string, nennfuelldruckBar = 200) {
+  const id = newId();
+  db.insert(o2Flaschen).values({ id, name, lagerortId, nennfuelldruckBar, aktiv: true, createdAt: new Date() }).run();
+  return id;
+}
+const messungenFuer = (db: ReturnType<typeof seed>["db"], flascheId: string) =>
+  db.select().from(o2Messungen).where(eq(o2Messungen.flascheId, flascheId)).all();
+
+describe("checkAbschluss – Sauerstoffflaschen", () => {
+  it("erfasst je Flasche eine Messung und zählt niedrige (Ampel rot)", async () => {
+    const { db, fz, pos } = seed();
+    const voll = seedFlasche(db, fz, "O2-A");   // 200 bar Nennfülldruck
+    const leer = seedFlasche(db, fz, "O2-B");
+    const { checkId, flaschenAuffaellig } = await checkAbschluss({
+      fahrzeugId: fz,
+      positionen: [{ sollPositionId: pos, ist: 4, nachfuellMenge: 0 }],
+      flaschen: [
+        { flascheId: voll, druckBar: 180 }, // 90 % → ok
+        { flascheId: leer, druckBar: 40 },  // 20 % → niedrig (rot)
+      ],
+    }, db);
+    expect(flaschenAuffaellig).toBe(1);
+    // Messungen sind append-only (Quelle = Token) und tragen die Check-Referenz.
+    const mVoll = messungenFuer(db, voll);
+    expect(mVoll).toHaveLength(1);
+    expect(mVoll[0]).toMatchObject({ druckBar: 180, quelleTyp: "token", quelleId: "111-111" });
+    expect(mVoll[0].kommentar).toContain(`check:${checkId}`);
+    expect(messungenFuer(db, leer)[0]).toMatchObject({ druckBar: 40 });
+    const e = erg(db, checkId);
+    expect(e.flaschen).toHaveLength(2);
+    expect(e.flaschen[0]).toMatchObject({ flascheId: voll, druckBar: 180, nennfuelldruckBar: 200 });
+  });
+
+  it("lehnt eine Flasche ab, die nicht an diesem Fahrzeug steht (Rollback)", async () => {
+    const { db, fz, a, pos } = seed();
+    const fremd = seedFlasche(db, HANDLAGER_ID, "fremd");
+    await expect(
+      checkAbschluss({ fahrzeugId: fz, positionen: [{ sollPositionId: pos, ist: 4, nachfuellMenge: 0 }], flaschen: [{ flascheId: fremd, druckBar: 150 }] }, db),
+    ).rejects.toThrow();
+    // Rollback: keine checks-Zeile, keine Messung, kein Abgleich gebucht
+    expect(db.select().from(checks).all()).toHaveLength(0);
+    expect(messungenFuer(db, fremd)).toHaveLength(0);
+    expect(bestandProLagerort(rows(db, a), fz)).toBe(0);
+  });
+
+  it("erlaubt Flaschen-only-Check ohne Soll-Positionen", async () => {
+    const db = createTestDb();
+    ensureHandlager(db);
+    const fz = newId();
+    db.insert(lagerorte).values({ id: fz, name: "RTW", typ: "fahrzeug", aktiv: true }).run();
+    const f = seedFlasche(db, fz, "O2");
+    const { checkId } = await checkAbschluss({ fahrzeugId: fz, flaschen: [{ flascheId: f, druckBar: 200 }] }, db);
+    const e = erg(db, checkId);
+    expect(e.flaschen).toHaveLength(1);
+    expect(e.positionen).toHaveLength(0);
+    expect(messungenFuer(db, f)).toHaveLength(1);
   });
 });
