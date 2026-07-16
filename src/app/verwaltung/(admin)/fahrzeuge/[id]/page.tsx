@@ -4,7 +4,9 @@ import { ArrowLeft, ChevronRight } from "lucide-react";
 import { getDb } from "@/db";
 import { fahrzeugListe, sollFuerFahrzeug, artikelListe, checkHistorie, templateListeAktiv, templateDetail } from "@/db/queries";
 import { geraeteFuerLagerort } from "@/db/geraete";
-import { fmtTs, geraetFaelligChip } from "@/lib/format";
+import { o2FlaschenFuerLagerort } from "@/db/sauerstoff";
+import { o2Status } from "@/lib/domain/o2";
+import { fmtTs, geraetFaelligChip, chipTone } from "@/lib/format";
 import { SollEditor } from "../SollEditor";
 import { FahrzeugAktivToggle } from "./FahrzeugAktivToggle";
 import { LoeschButton } from "@/components/LoeschButton";
@@ -25,6 +27,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
   const unterSoll = aktivePositionen.filter((p) => p.fahrzeugBestand < p.soll).length;
   const checks = checkHistorie(db).filter((c) => c.fahrzeugId === id).slice(0, 8);
   const geraete = geraeteFuerLagerort(db, id);
+  const flaschen = o2FlaschenFuerLagerort(db, id);
   // Verknüpfte Vorlage sperrt sich selbst aus der Auswahlliste aus (kein „auf sich selbst" zuweisen).
   const templates = templateListeAktiv(db).filter((t) => t.id !== fahrzeug.templateId);
   const templateName = fahrzeug.templateId ? (templateDetail(db, fahrzeug.templateId)?.name ?? null) : null;
@@ -78,6 +81,35 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
         </div>
       )}
 
+      <h2 className="secthead">Sauerstoffflaschen an diesem Fahrzeug</h2>
+      {flaschen.length === 0 ? (
+        <div className="card cardpad">
+          Keine Flaschen hinterlegt. Unter <Link href="/verwaltung/sauerstoff">Sauerstoff</Link> anlegen und als Standort dieses Fahrzeug wählen.
+        </div>
+      ) : (
+        <div className="card">
+          {flaschen.map((f) => {
+            const st = f.letzterDruck !== null ? o2Status(f.letzterDruck, f.nennfuelldruckBar) : null;
+            return (
+              <Link className="row" key={f.id} href={`/verwaltung/sauerstoff/${f.id}`}>
+                <div className="rowmain">
+                  <div className="rowname">{f.name}</div>
+                  <div className="rowmeta">
+                    <span className="chip chip-grau">Nennfülldruck {f.nennfuelldruckBar} bar</span>
+                    {st ? (
+                      <span className={`chip chip-${chipTone(st.ampel)}`}>{st.prozent}%</span>
+                    ) : (
+                      <span className="chip chip-grau">keine Messung</span>
+                    )}
+                  </div>
+                </div>
+                <ChevronRight size={18} style={{ color: "var(--stahl)", flex: "none" }} />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       <h2 className="secthead">Letzte Checks</h2>
       {checks.length === 0 ? (
         <div className="card cardpad">Für dieses Fahrzeug wurde noch kein Check durchgeführt.</div>
@@ -92,7 +124,8 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
                   {c.korrigiertGesamt > 0 && <span className="chip chip-gelb">{c.korrigiertGesamt} korrigiert</span>}
                   {c.offenGesamt > 0 && <span className="chip chip-rot">{c.offenGesamt} fehlt</span>}
                   {c.geraeteAuffaellig > 0 && <span className="chip chip-rot">{c.geraeteAuffaellig} Gerät(e) auffällig</span>}
-                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && c.geraeteAuffaellig === 0 && <span className="chip chip-ok">vollständig</span>}
+                  {c.flaschenAuffaellig > 0 && <span className="chip chip-rot">{c.flaschenAuffaellig} Flasche(n) niedrig</span>}
+                  {c.nachgefuelltGesamt === 0 && c.korrigiertGesamt === 0 && c.offenGesamt === 0 && c.geraeteAuffaellig === 0 && c.flaschenAuffaellig === 0 && <span className="chip chip-ok">vollständig</span>}
                   <small>{c.positionen} Positionen</small>
                 </div>
               </div>

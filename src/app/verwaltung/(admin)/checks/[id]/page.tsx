@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, AlertTriangle, Check } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Check, Wind } from "lucide-react";
 import { getDb } from "@/db";
 import { checkDetail } from "@/db/queries";
-import { fmtTs } from "@/lib/format";
+import { fmtTs, chipTone } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +126,29 @@ export default async function CheckDetailPage({ params }: { params: Promise<{ id
                       <span className="chip chip-rot"><AlertTriangle size={11} /> fehlt</span>
                     )}
                     {g.bemerkung && <small>· {g.bemerkung}</small>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {check.flaschen.length > 0 && (
+        <>
+          <h2 className="secthead">Sauerstoff {check.summe.flaschenAuffaellig > 0 && <span className="chip chip-rot" style={{ marginLeft: 6 }}>{check.summe.flaschenAuffaellig} niedrig</span>}</h2>
+          <div className="card">
+            {check.flaschen.map((f) => (
+              <div className="row" key={f.flascheId}>
+                <div className={`checkcircle ${f.niedrig ? "fehl" : "done"}`}>
+                  {f.niedrig ? <AlertTriangle size={14} /> : <Wind size={16} />}
+                </div>
+                <div className="rowmain">
+                  <div className="rowname">{f.name}</div>
+                  <div className="rowmeta" style={{ flexWrap: "wrap" }}>
+                    <small>{f.druckBar} bar · Nennfülldruck {f.nennfuelldruckBar} bar</small>
+                    <span className={`chip chip-${chipTone(f.ampel)}`}>{f.prozent}%</span>
+                    {f.niedrig && <span className="chip chip-rot"><AlertTriangle size={11} /> niedriger Druck</span>}
                   </div>
                 </div>
               </div>

@@ -3,11 +3,12 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb, type DB } from "@/db";
-import { checks, sollPositionen, geraete, newId } from "@/db/schema";
+import { checks, sollPositionen, geraete, o2Flaschen, o2Messungen, newId } from "@/db/schema";
 import { requireHelfer } from "@/actions/session";
 import { HANDLAGER_ID } from "@/db/seed-handlager";
 import { korrekturAufLagerort } from "@/db/korrektur";
 import { umlagerung } from "@/db/umlagerung";
+import { o2Status } from "@/lib/domain/o2";
 
 const CheckSchema = z.object({
   fahrzeugId: z.string().min(1),
@@ -35,6 +36,16 @@ const CheckSchema = z.object({
       }),
     )
     .default([]),
+  // Sauerstoffflaschen (standort-basiert): am Fahrzeug abgelesener Druck je Flasche. Jede Angabe
+  // wird als unveränderliche o2-Messung (append-only) festgehalten.
+  flaschen: z
+    .array(
+      z.object({
+        flascheId: z.string().min(1),
+        druckBar: z.coerce.number().int().min(0),
+      }),
+    )
+    .default([]),
 });
 
 // Fahrzeug-Check-Abschluss (§7 Regel 6, lagerort-echt): EINE Transaktion.
@@ -50,6 +61,7 @@ export async function checkAbschluss(input: z.input<typeof CheckSchema>, db: DB 
   let nachgefuellt = 0; // tatsächlich (nach Handlager-Kappung) umgelagerte Gesamtmenge
   let offen = 0; // nach dem Check noch fehlend (Soll − gezählt − nachgefüllt), z. B. Handlager leer
   let geraeteAuffaellig = 0; // Geräte, die fehlen oder als "Defekt" quittiert wurden
+  let flaschenAuffaellig = 0; // Sauerstoffflaschen mit niedrigem Druck (Ampel rot)
   db.transaction((tx) => {
     // Grabsteine (entfernt) sind kein Soll → aus der gültigen Positionsmenge ausschließen.
     const sollRows = tx.select().from(sollPositionen).where(eq(sollPositionen.fahrzeugId, v.fahrzeugId)).all().filter((s) => !s.entfernt);
@@ -102,14 +114,32 @@ export async function checkAbschluss(input: z.input<typeof CheckSchema>, db: DB 
       return { geraetId: e.geraetId, vorhanden: e.vorhanden, zustand: e.zustand ?? null, bemerkung: e.bemerkung ?? null };
     });
 
+    // Sauerstoffflaschen am Fahrzeug (standort-basiert): nur Flaschen akzeptieren, die wirklich hier
+    // stehen (Grabstein-analog zu Geräten). Der abgelesene Druck wird als append-only Messung
+    // festgehalten; niedriger Druck (Ampel rot ggü. Nennfülldruck) zählt als auffällig.
+    const flaschenHier = new Map(tx.select().from(o2Flaschen).where(eq(o2Flaschen.lagerortId, v.fahrzeugId)).all().map((f) => [f.id, f]));
+    const flaschenErgebnis = v.flaschen.map((e) => {
+      const f = flaschenHier.get(e.flascheId);
+      if (!f) throw new Error("Flasche gehört nicht zu diesem Fahrzeug");
+      tx.insert(o2Messungen).values({
+        id: newId(), flascheId: e.flascheId, ts: new Date(), druckBar: e.druckBar,
+        quelleTyp: "token", quelleId: code, kommentar: `Fahrzeug-Check ${referenz}`,
+      }).run();
+      if (o2Status(e.druckBar, f.nennfuelldruckBar).niedrig) flaschenAuffaellig++;
+      // Nennfülldruck als Snapshot mitschreiben, damit der Füllstand später auch dann rekonstruierbar
+      // ist, wenn die Flasche umkonfiguriert oder gelöscht wird.
+      return { flascheId: e.flascheId, druckBar: e.druckBar, nennfuelldruckBar: f.nennfuelldruckBar };
+    });
+
     tx.insert(checks).values({
       id: checkId, fahrzeugId: v.fahrzeugId, quelleTyp: "token", quelleId: code,
       startedAt: new Date(), completedAt: new Date(),
-      ergebnis: JSON.stringify({ positionen: posErgebnis, artikel: artikelErgebnis, geraete: geraeteErgebnis }),
+      ergebnis: JSON.stringify({ positionen: posErgebnis, artikel: artikelErgebnis, geraete: geraeteErgebnis, flaschen: flaschenErgebnis }),
     }).run();
   });
   revalidatePath("/helfer/check");
   revalidatePath("/verwaltung/checks");
   revalidatePath("/verwaltung");
-  return { checkId, nachgefuellt, offen, geraeteAuffaellig };
+  revalidatePath("/verwaltung/sauerstoff");
+  return { checkId, nachgefuellt, offen, geraeteAuffaellig, flaschenAuffaellig };
 }

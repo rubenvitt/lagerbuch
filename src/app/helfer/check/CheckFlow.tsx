@@ -1,8 +1,10 @@
 "use client";
 import { useState, useTransition } from "react";
-import { Check, AlertTriangle, ArrowRight, PackageCheck, PackageSearch, HeartPulse, Package } from "lucide-react";
+import { Check, AlertTriangle, ArrowRight, PackageCheck, PackageSearch, HeartPulse, Package, Wind } from "lucide-react";
 import { Stepper } from "@/components/Stepper";
 import { checkAbschluss } from "@/actions/check";
+import { o2Status } from "@/lib/domain/o2";
+import { chipTone } from "@/lib/format";
 
 type Pos = {
   id: string; fachLabel: string; artikelId: string; artikelName: string; einheit: string;
@@ -10,10 +12,11 @@ type Pos = {
 };
 type Fahrzeug = { id: string; name: string; kennung: string | null };
 type GeraetCheck = { id: string; typ: "medizin" | "objekt"; name: string };
-type Phase = "zaehlen" | "nachfuellen" | "geraete";
+type FlascheCheck = { id: string; name: string; nennfuelldruckBar: number; letzterDruck: number | null };
+type Phase = "zaehlen" | "nachfuellen" | "geraete" | "sauerstoff";
 type GeraetEingabe = { vorhanden: boolean; zustand: string; bemerkung: string };
 
-const PHASE_LABEL: Record<Phase, string> = { zaehlen: "Zählen", nachfuellen: "Nachfüllen", geraete: "Geräte" };
+const PHASE_LABEL: Record<Phase, string> = { zaehlen: "Zählen", nachfuellen: "Nachfüllen", geraete: "Geräte", sauerstoff: "Sauerstoff" };
 const ZUSTAENDE = ["In Ordnung", "Gebrauchsspuren", "Defekt"] as const;
 const zustandTone = (z: string): "ok" | "gelb" | "rot" | "grau" =>
   z === "In Ordnung" ? "ok" : z === "Gebrauchsspuren" ? "gelb" : z === "Defekt" ? "rot" : "grau";
@@ -37,11 +40,13 @@ export function CheckFlow({
   fahrzeuge,
   soll,
   geraete,
+  flaschen,
   preselect,
 }: {
   fahrzeuge: Fahrzeug[];
   soll: Record<string, Pos[]>;
   geraete: Record<string, GeraetCheck[]>;
+  flaschen: Record<string, FlascheCheck[]>;
   preselect?: string | null;
 }) {
   // Ein Code mit Fahrzeug-Ziel wählt das Fahrzeug direkt vor; sonst wie gehabt (nur eins → direkt).
@@ -50,7 +55,8 @@ export function CheckFlow({
   const [ist, setIst] = useState<Record<string, number>>({});
   const [nachfuell, setNachfuell] = useState<Record<string, number>>({});
   const [geraeteState, setGeraeteState] = useState<Record<string, GeraetEingabe>>({});
-  const [result, setResult] = useState<{ nachgefuellt: number; offen: number; geraeteAuffaellig: number } | null>(null);
+  const [druck, setDruck] = useState<Record<string, number>>({});
+  const [result, setResult] = useState<{ nachgefuellt: number; offen: number; geraeteAuffaellig: number; flaschenAuffaellig: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -73,6 +79,7 @@ export function CheckFlow({
   const veh = fahrzeuge.find((f) => f.id === vehId)!;
   const positionen = soll[vehId] ?? [];
   const geraeteListe = geraete[vehId] ?? [];
+  const flaschenListe = flaschen[vehId] ?? [];
   const faecher = [...new Set(positionen.map((p) => p.fachLabel))];
   // Default = Soll ("voll annehmen, Gezähltes runterkorrigieren"). Der recorded Fahrzeugbestand
   // wird bewusst NICHT als Per-Position-Default genutzt: er ist pro Artikel (nicht pro Fach), und
@@ -80,21 +87,28 @@ export function CheckFlow({
   const istWert = (p: Pos) => ist[p.id] ?? p.soll;
   const nfWert = (p: Pos) => nachfuell[p.id] ?? 0;
 
-  // Welche Schritte hat dieses Fahrzeug? Artikel bringen Zählen+Nachfüllen, Geräte hängen als
-  // Quittier-Schritt hinten an. Der Commit passiert immer im letzten Schritt der Folge.
+  // Welche Schritte hat dieses Fahrzeug? Artikel bringen Zählen+Nachfüllen, Geräte und
+  // Sauerstoffflaschen hängen als eigene Schritte hinten an. Der Commit passiert immer im letzten
+  // Schritt der Folge.
   const hatArtikel = positionen.length > 0;
   const hatGeraete = geraeteListe.length > 0;
+  const hatFlaschen = flaschenListe.length > 0;
   const schrittFolge: Phase[] = [
     ...(hatArtikel ? (["zaehlen", "nachfuellen"] as const) : []),
     ...(hatGeraete ? (["geraete"] as const) : []),
+    ...(hatFlaschen ? (["sauerstoff"] as const) : []),
   ];
   const aktivePhase: Phase = schrittFolge.includes(phase) ? phase : (schrittFolge[0] ?? "zaehlen");
   const idx = schrittFolge.indexOf(aktivePhase);
   const istLetzter = idx === schrittFolge.length - 1;
+  const naechste = schrittFolge[idx + 1]; // undefined im letzten Schritt
 
   const geraetE = (id: string): GeraetEingabe => geraeteState[id] ?? GERAET_DEFAULT;
   const setGeraet = (id: string, patch: Partial<GeraetEingabe>) =>
     setGeraeteState((s) => ({ ...s, [id]: { ...(s[id] ?? GERAET_DEFAULT), ...patch } }));
+
+  // Druck-Default = Nennfülldruck ("voll annehmen, Abgelesenes runterstellen").
+  const druckWert = (f: FlascheCheck) => druck[f.id] ?? f.nennfuelldruckBar;
 
   // Gemeinsamer Abschluss (aus dem jeweils letzten Schritt aufgerufen): Positionen + Geräte senden.
   const abschluss = () => {
@@ -108,8 +122,9 @@ export function CheckFlow({
             const e = geraetE(g.id);
             return { geraetId: g.id, vorhanden: e.vorhanden, zustand: e.vorhanden ? e.zustand : undefined, bemerkung: e.bemerkung.trim() || undefined };
           }),
+          flaschen: flaschenListe.map((f) => ({ flascheId: f.id, druckBar: druckWert(f) })),
         });
-        setResult({ nachgefuellt: r.nachgefuellt, offen: r.offen, geraeteAuffaellig: r.geraeteAuffaellig });
+        setResult({ nachgefuellt: r.nachgefuellt, offen: r.offen, geraeteAuffaellig: r.geraeteAuffaellig, flaschenAuffaellig: r.flaschenAuffaellig });
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Fehler beim Abschließen – bitte erneut versuchen");
       }
@@ -120,13 +135,13 @@ export function CheckFlow({
     return (
       <>
         <div className="screenhead">{veh.name}</div>
-        <div className="card cardpad">Für dieses Fahrzeug ist weder ein Soll noch ein Gerät hinterlegt – nichts zu prüfen.</div>
+        <div className="card cardpad">Für dieses Fahrzeug ist weder ein Soll noch ein Gerät noch eine Sauerstoffflasche hinterlegt – nichts zu prüfen.</div>
       </>
     );
   }
 
   if (result) {
-    const alles = result.offen === 0 && result.geraeteAuffaellig === 0;
+    const alles = result.offen === 0 && result.geraeteAuffaellig === 0 && result.flaschenAuffaellig === 0;
     return (
       <>
         <div className="screenhead">{veh.name} · Fertig</div>
@@ -138,6 +153,7 @@ export function CheckFlow({
             {hatArtikel && <span className="chip chip-ok">{result.nachgefuellt} aus Handlager geholt</span>}
             {result.offen > 0 && <span className="chip chip-rot"><AlertTriangle size={11} /> {result.offen} fehlt weiterhin</span>}
             {result.geraeteAuffaellig > 0 && <span className="chip chip-rot"><AlertTriangle size={11} /> {result.geraeteAuffaellig} Gerät(e) auffällig</span>}
+            {result.flaschenAuffaellig > 0 && <span className="chip chip-rot"><AlertTriangle size={11} /> {result.flaschenAuffaellig} Flasche(n) niedrig</span>}
           </div>
           {result.offen > 0 && (
             <small style={{ color: "var(--stahl)", display: "block", marginTop: 8 }}>
@@ -149,8 +165,13 @@ export function CheckFlow({
               Fehlende oder defekte Geräte bitte der Verwaltung melden.
             </small>
           )}
+          {result.flaschenAuffaellig > 0 && (
+            <small style={{ color: "var(--stahl)", display: "block", marginTop: 8 }}>
+              Flaschen mit niedrigem Druck bitte tauschen oder der Verwaltung melden.
+            </small>
+          )}
         </div>
-        <button className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => { setResult(null); setPhase(schrittFolge[0]); setIst({}); setNachfuell({}); setGeraeteState({}); setVehId(fahrzeuge.length === 1 ? vehId : null); }}>Weiterer Check</button>
+        <button className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => { setResult(null); setPhase(schrittFolge[0]); setIst({}); setNachfuell({}); setGeraeteState({}); setDruck({}); setVehId(fahrzeuge.length === 1 ? vehId : null); }}>Weiterer Check</button>
       </>
     );
   }
@@ -264,7 +285,60 @@ export function CheckFlow({
         <div className="summary">
           <div className="info">
             <b>{geraeteListe.length} Gerät(e)</b>
-            <div>Quittieren schließt den Check ab</div>
+            <div>{istLetzter ? "Quittieren schließt den Check ab" : `Weiter zu ${PHASE_LABEL[naechste]}`}</div>
+          </div>
+          {istLetzter ? (
+            <button className="go" disabled={pending} onClick={abschluss} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <PackageCheck size={16} /> Abschließen
+            </button>
+          ) : (
+            <button className="go" onClick={() => setPhase(naechste)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              Weiter <ArrowRight size={16} />
+            </button>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ——— Schritt: Sauerstoff (Druck ablesen) ———
+  if (aktivePhase === "sauerstoff") {
+    const niedrig = flaschenListe.filter((f) => o2Status(druckWert(f), f.nennfuelldruckBar).niedrig).length;
+    return (
+      <>
+        <div className="screenhead">{veh.name} · Sauerstoff</div>
+        <Schritte folge={schrittFolge} aktiv={aktivePhase} />
+        {idx > 0 && <button className="btn btn-ghost" onClick={() => setPhase(schrittFolge[idx - 1])} style={{ marginBottom: 10 }}>← Zurück</button>}
+        <div className="card cardpad" style={{ marginBottom: 4 }}>
+          <div className="rowname" style={{ fontSize: 14 }}>Welchen Druck zeigt das Manometer?</div>
+          <small style={{ color: "var(--stahl)" }}>Jede Flasche ist auf den Nennfülldruck vorbelegt – mit <b>−</b> auf den abgelesenen Wert runterstellen.</small>
+        </div>
+        <div className="card">
+          {flaschenListe.map((f) => {
+            const wert = druckWert(f);
+            const st = o2Status(wert, f.nennfuelldruckBar);
+            return (
+              <div className="row" key={f.id}>
+                <div className={`checkcircle ${st.niedrig ? "fehl" : "done"}`}>{st.niedrig ? <AlertTriangle size={14} /> : <Wind size={16} />}</div>
+                <div className="rowmain">
+                  <div className="rowname">{f.name}</div>
+                  <div className="rowmeta">
+                    <small>Nennfülldruck {f.nennfuelldruckBar} bar</small>
+                    <span className={`chip chip-${chipTone(st.ampel)}`}>{st.prozent}%</span>
+                    {st.niedrig && <span className="chip chip-rot"><AlertTriangle size={11} /> niedrig</span>}
+                  </div>
+                </div>
+                {/* max großzügig über Nennfülldruck: eine überfüllte Flasche muss ablesbar bleiben. */}
+                <Stepper sm wert={wert} min={0} max={9999} setWert={(vv) => setDruck((s) => ({ ...s, [f.id]: vv }))} />
+              </div>
+            );
+          })}
+        </div>
+        {err && <div className="card cardpad"><div className="gateerr">{err}</div></div>}
+        <div className="summary">
+          <div className="info">
+            <b>{niedrig === 0 ? `${flaschenListe.length} Flasche(n)` : `${niedrig} niedrig`}</b>
+            <div>Bestätigen schließt den Check ab</div>
           </div>
           <button className="go" disabled={pending} onClick={abschluss} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <PackageCheck size={16} /> Abschließen
@@ -334,14 +408,14 @@ export function CheckFlow({
       <div className="summary">
         <div className="info">
           <b>{summeNachfuell} Teile aufs Fahrzeug</b>
-          <div>{istLetzter ? `Bestätigen bucht Handlager → ${veh.name}` : "Weiter zur Geräte-Prüfung"}</div>
+          <div>{istLetzter ? `Bestätigen bucht Handlager → ${veh.name}` : `Weiter zu ${PHASE_LABEL[naechste]}`}</div>
         </div>
         {istLetzter ? (
           <button className="go" disabled={pending} onClick={abschluss} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <PackageCheck size={16} /> Gelegt & abschließen
           </button>
         ) : (
-          <button className="go" onClick={() => setPhase("geraete")} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button className="go" onClick={() => setPhase(naechste)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             Weiter <ArrowRight size={16} />
           </button>
         )}
