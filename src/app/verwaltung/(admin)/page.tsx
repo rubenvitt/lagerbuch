@@ -16,7 +16,7 @@ export default function VerwaltungHome() {
 
   const k = kennzahlen(db);
   const artikel = artikelListe(db);
-  const journal = journalEintraege(db, 5);
+  const journal = journalEintraege(db, { limit: 5 });
 
   const kritischeArtikel = artikel
     .map((a) => {

@@ -39,7 +39,7 @@ describe("queries", () => {
   });
   it("journalEintraege lists newest first with artikel name", () => {
     const { db } = seed();
-    const j = journalEintraege(db, 10);
+    const j = journalEintraege(db, { limit: 10 });
     expect(j[0].artikelName).toBe("Mullbinde");
   });
 
@@ -115,10 +115,94 @@ describe("queries", () => {
     db.insert(buchungen).values({ id: newId(), ts: older, typ: "zugang", artikelId: a, chargeId: c, lagerortId: lo, menge: 2, quelleTyp: "oidc", quelleId: "u1", kommentar: "alt" }).run();
     db.insert(buchungen).values({ id: newId(), ts: newer, typ: "zugang", artikelId: a, chargeId: c, lagerortId: lo, menge: 3, quelleTyp: "oidc", quelleId: "u1", kommentar: "neu" }).run();
 
-    const j = journalEintraege(db, 10);
+    const j = journalEintraege(db, { limit: 10 });
     expect(j[0].ts.getTime()).toBe(newer.getTime());
     expect(j[0].kommentar).toBe("neu");
     expect(j[1].ts.getTime()).toBe(older.getTime());
+  });
+});
+
+describe("journalEintraege Filter", () => {
+  function seedJournal() {
+    const db = createTestDb();
+    const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+    const aMull = newId(); db.insert(artikel).values({ id: aMull, name: "Mullbinde", einheit: "Stk.", fach: "A2", mindestbestand: 0, createdAt: new Date(2020, 0, 1) }).run();
+    const aPfl = newId(); db.insert(artikel).values({ id: aPfl, name: "Pflaster", einheit: "Stk.", fach: "B1", mindestbestand: 0, createdAt: new Date(2020, 0, 1) }).run();
+    const cMull = newId(); db.insert(chargen).values({ id: cMull, artikelId: aMull, chargenNr: "C1", verfall: "2028-01", createdAt: new Date(2020, 0, 1) }).run();
+    const cPfl = newId(); db.insert(chargen).values({ id: cPfl, artikelId: aPfl, chargenNr: "C2", verfall: "2028-01", createdAt: new Date(2020, 0, 1) }).run();
+    db.insert(buchungen).values({ id: newId(), ts: new Date(2020, 5, 1), typ: "zugang", artikelId: aMull, chargeId: cMull, lagerortId: lo, menge: 10, quelleTyp: "oidc", quelleId: "u1", kommentar: "Lieferung Frühjahr" }).run();
+    db.insert(buchungen).values({ id: newId(), ts: new Date(2021, 5, 1), typ: "entnahme", artikelId: aMull, chargeId: cMull, lagerortId: lo, menge: -2, quelleTyp: "oidc", quelleId: "u1", kommentar: "Einsatz" }).run();
+    db.insert(buchungen).values({ id: newId(), ts: new Date(2022, 5, 1), typ: "zugang", artikelId: aPfl, chargeId: cPfl, lagerortId: lo, menge: 5, quelleTyp: "oidc", quelleId: "u1", kommentar: null }).run();
+    return { db };
+  }
+
+  it("filtert per Artikelname (Freitext, case-insensitive)", () => {
+    const j = journalEintraege(seedJournal().db, { q: "MULL" });
+    expect(j).toHaveLength(2);
+    expect(j.every((e) => e.artikelName === "Mullbinde")).toBe(true);
+  });
+  it("filtert per Kommentar (Freitext)", () => {
+    const j = journalEintraege(seedJournal().db, { q: "einsatz" });
+    expect(j).toHaveLength(1);
+    expect(j[0].kommentar).toBe("Einsatz");
+  });
+  it("filtert per Vorgangstyp", () => {
+    const j = journalEintraege(seedJournal().db, { typ: "entnahme" });
+    expect(j).toHaveLength(1);
+    expect(j[0].typ).toBe("entnahme");
+  });
+  it("filtert per Zeitraum (von/bis inklusive)", () => {
+    const j = journalEintraege(seedJournal().db, { von: new Date(2021, 0, 1), bis: new Date(2021, 11, 31, 23, 59, 59) });
+    expect(j).toHaveLength(1);
+    expect(j[0].ts.getFullYear()).toBe(2021);
+  });
+  it("kombiniert Filter per UND", () => {
+    const j = journalEintraege(seedJournal().db, { q: "mull", typ: "zugang" });
+    expect(j).toHaveLength(1);
+    expect(j[0].typ).toBe("zugang");
+  });
+  it("sucht über die ganze Historie, nicht nur im Limit-Fenster", () => {
+    // Limit 1 würde ohne WHERE nur den neuesten (Pflaster 2022) zeigen; die Suche muss dennoch
+    // die älteren Mullbinde-Einträge finden (Filter greift VOR dem Limit).
+    const j = journalEintraege(seedJournal().db, { q: "mull", limit: 1 });
+    expect(j).toHaveLength(1);
+    expect(j[0].artikelName).toBe("Mullbinde");
+  });
+  it("behandelt LIKE-Wildcards (%) im Freitext wörtlich (kein Over-Match)", () => {
+    const db = createTestDb();
+    const lo = HANDLAGER_ID; db.insert(lagerorte).values({ id: lo, name: "Handlager", typ: "lager" }).run();
+    const a = newId(); db.insert(artikel).values({ id: a, name: "Glucose", einheit: "Fl.", fach: "B1", mindestbestand: 0, createdAt: new Date(2020, 0, 1) }).run();
+    const c = newId(); db.insert(chargen).values({ id: c, artikelId: a, chargenNr: "C", verfall: "2028-01", createdAt: new Date(2020, 0, 1) }).run();
+    db.insert(buchungen).values({ id: newId(), ts: new Date(2021, 0, 1), typ: "zugang", artikelId: a, chargeId: c, lagerortId: lo, menge: 1, quelleTyp: "oidc", quelleId: "u", kommentar: "Glucose 5%" }).run();
+    db.insert(buchungen).values({ id: newId(), ts: new Date(2021, 0, 2), typ: "zugang", artikelId: a, chargeId: c, lagerortId: lo, menge: 1, quelleTyp: "oidc", quelleId: "u", kommentar: "5 Ampullen" }).run();
+    // Ohne Escaping würde das Muster "%5%%" auch "5 Ampullen" matchen.
+    const j = journalEintraege(db, { q: "5%" });
+    expect(j).toHaveLength(1);
+    expect(j[0].kommentar).toBe("Glucose 5%");
+  });
+});
+
+describe("checkHistorie Filter", () => {
+  function seedChecks() {
+    const db = createTestDb();
+    const fzA = newId(); db.insert(lagerorte).values({ id: fzA, name: "RTW 1", typ: "fahrzeug", aktiv: true }).run();
+    const fzB = newId(); db.insert(lagerorte).values({ id: fzB, name: "KTW 2", typ: "fahrzeug", aktiv: true }).run();
+    db.insert(checks).values({ id: newId(), fahrzeugId: fzA, quelleTyp: "token", quelleId: "t", startedAt: new Date(2020, 0, 1), completedAt: new Date(2020, 0, 1), ergebnis: "{}" }).run();
+    db.insert(checks).values({ id: newId(), fahrzeugId: fzA, quelleTyp: "token", quelleId: "t", startedAt: new Date(2022, 0, 1), completedAt: new Date(2022, 0, 1), ergebnis: "{}" }).run();
+    db.insert(checks).values({ id: newId(), fahrzeugId: fzB, quelleTyp: "token", quelleId: "t", startedAt: new Date(2021, 0, 1), completedAt: new Date(2021, 0, 1), ergebnis: "{}" }).run();
+    return { db, fzA };
+  }
+
+  it("filtert per Fahrzeug", () => {
+    const { db, fzA } = seedChecks();
+    const h = checkHistorie(db, { fahrzeugId: fzA });
+    expect(h).toHaveLength(2);
+    expect(h.every((c) => c.fahrzeugName === "RTW 1")).toBe(true);
+  });
+  it("filtert per Zeitraum", () => {
+    const h = checkHistorie(seedChecks().db, { von: new Date(2021, 0, 1), bis: new Date(2021, 11, 31, 23, 59, 59) });
+    expect(h).toHaveLength(1);
+    expect(h[0].fahrzeugName).toBe("KTW 2");
   });
 });
 

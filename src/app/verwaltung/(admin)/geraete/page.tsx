@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { ChevronRight, AlertTriangle, ScanBarcode, HeartPulse, Package } from "lucide-react";
+import { ScanBarcode } from "lucide-react";
 import { getDb } from "@/db";
 import { geraeteUebersicht } from "@/db/geraete";
 import { lagerortOptionen } from "@/db/bz";
-import { geraetFaelligChip } from "@/lib/format";
 import { NeuGeraet } from "./NeuGeraet";
+import { GeraeteListe } from "./GeraeteListe";
 
 export const dynamic = "force-dynamic";
 
@@ -36,38 +36,7 @@ export default function GeraetePage() {
         <div className={`kpi ${objektAblaufend ? "gelb" : "ok"}`}><b>{objektAblaufend}</b><div>Objekte ablaufend</div></div>
       </div>
 
-      {geraete.length === 0 && <div className="card cardpad">Noch keine Geräte. Lege oben das erste an.</div>}
-      {geraete.length > 0 && (
-        <div className="card">
-          {geraete.map((g) => {
-            const fi = geraetFaelligChip(g.typ, g.faelligkeit);
-            const TypIcon = g.typ === "medizin" ? HeartPulse : Package;
-            return (
-              <Link className="row" key={g.id} href={`/verwaltung/geraete/${g.id}`}>
-                <div className="rowmain">
-                  <div className="rowname">
-                    {g.name}
-                    {g.barcode ? <span className="mono" style={{ marginLeft: 8, color: "var(--stahl)" }}>{g.barcode}</span> : null}
-                  </div>
-                  <div className="rowmeta">
-                    <span className="chip chip-grau" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <TypIcon size={11} /> {g.typ === "medizin" ? "Medizin" : "Objekt"}
-                    </span>
-                    {!g.aktiv && <span className="chip chip-grau">inaktiv</span>}
-                    <small>{g.lagerortName}</small>
-                    {fi && (
-                      <span className={`chip chip-${fi.tone}`} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        {fi.tone === "rot" && <AlertTriangle size={11} />} {fi.text}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ChevronRight size={18} style={{ color: "var(--stahl)", flex: "none" }} />
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <GeraeteListe geraete={geraete} />
     </>
   );
 }

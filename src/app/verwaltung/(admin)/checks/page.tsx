@@ -1,18 +1,39 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { getDb } from "@/db";
-import { checkHistorie } from "@/db/queries";
-import { fmtTs } from "@/lib/format";
+import { checkHistorie, fahrzeugListe } from "@/db/queries";
+import { fmtTs, parseDatumGrenze } from "@/lib/format";
+import { ChecksFilter } from "./ChecksFilter";
 
 export const dynamic = "force-dynamic";
 
-export default function ChecksPage() {
-  const checks = checkHistorie(getDb());
+export default async function ChecksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ fz?: string; von?: string; bis?: string }>;
+}) {
+  const sp = await searchParams;
+  const db = getDb();
+  const fahrzeuge = fahrzeugListe(db)
+    .map((f) => ({ id: f.id, name: f.name, kennung: f.kennung }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const fz = fahrzeuge.some((f) => f.id === sp.fz) ? sp.fz! : "";
+  const von = sp.von ?? "";
+  const bis = sp.bis ?? "";
+
+  const checks = checkHistorie(db, {
+    fahrzeugId: fz || undefined,
+    von: parseDatumGrenze(von, false),
+    bis: parseDatumGrenze(bis, true),
+  });
+
   return (
     <>
       <div className="mainhead"><h1>Fahrzeug-Checks</h1></div>
-      {checks.length === 0 && <div className="card cardpad">Noch keine Checks durchgeführt.</div>}
-      {checks.length > 0 && (
+      <ChecksFilter fz={fz} von={von} bis={bis} fahrzeuge={fahrzeuge} />
+      {checks.length === 0 ? (
+        <div className="card"><div className="empty">Keine Checks gefunden.</div></div>
+      ) : (
         <div className="card">
           {checks.map((c) => (
             <Link className="row" key={c.id} href={`/verwaltung/checks/${c.id}`}>
