@@ -19,7 +19,9 @@ test("Geräte: anlegen + Barcode-Scan findet das Gerät", async ({ page }) => {
   await page.getByPlaceholder("Barcode / Seriennummer").fill(barcode);
   // Bewusst ins Handlager legen (nicht auf ein Check-Fahrzeug), sonst taucht das Gerät im
   // Geräte-Schritt des zweiten Tests auf und verfälscht dessen Selektoren.
-  await page.getByRole("combobox").selectOption({ label: "Handlager" });
+  // Standort ist eine suchbare Combobox: öffnen und den Eintrag „Handlager“ wählen.
+  await page.getByRole("combobox", { name: "Standort" }).click();
+  await page.getByRole("option", { name: "Handlager", exact: true }).click();
   await page.getByRole("button", { name: "Gerät anlegen" }).click();
   await expect(page.getByRole("link", { name: /E2E Corpuls/ })).toBeVisible({ timeout: 20_000 });
 

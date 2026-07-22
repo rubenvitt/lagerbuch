@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { TemplatePositionZeile } from "@/db/queries";
 import { templatePositionSetzen, templatePositionEntfernen } from "@/actions/templates";
+import { Combobox, type ComboOption } from "@/components/Combobox";
 
 type Artikel = { id: string; name: string; fach: string; einheit: string };
 
@@ -15,6 +16,12 @@ export function TemplatePosEditor({ templateId, positionen, artikel }: { templat
 
   const faecher = [...new Set(positionen.map((p) => p.fachLabel))];
   const freitext = neuFach || faecher.length === 0;
+
+  // Fächer A–Z; „Neues Fach“ bewusst als letzte Aktion (daher selbst sortiert, Combobox nicht).
+  const fachOptionen: ComboOption[] = [
+    ...[...faecher].sort((a, b) => a.localeCompare(b, "de")).map((f) => ({ value: f, label: f })),
+    { value: "__neu__", label: "+ Neues Fach…" },
+  ];
 
   function add() {
     if (!fach.trim() || !artikelId || soll < 1) return;
@@ -54,20 +61,23 @@ export function TemplatePosEditor({ templateId, positionen, artikel }: { templat
             )}
           </>
         ) : (
-          <select
-            className="input"
+          <Combobox
+            options={fachOptionen}
             value={fach}
-            onChange={(e) => { if (e.target.value === "__neu__") { setNeuFach(true); setFach(""); } else setFach(e.target.value); }}
-          >
-            <option value="">Fach wählen…</option>
-            {faecher.map((f) => <option key={f} value={f}>{f}</option>)}
-            <option value="__neu__">+ Neues Fach…</option>
-          </select>
+            onChange={(v) => { if (v === "__neu__") { setNeuFach(true); setFach(""); } else setFach(v); }}
+            placeholder="Fach wählen…"
+            sort={false}
+            ariaLabel="Fach"
+          />
         )}
-        <select className="input" value={artikelId} onChange={(e) => setArtikelId(e.target.value)}>
-          <option value="">Artikel wählen…</option>
-          {artikel.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
+        <Combobox
+          options={artikel.map((a) => ({ value: a.id, label: a.name, keywords: a.fach }))}
+          value={artikelId}
+          onChange={setArtikelId}
+          placeholder="Artikel wählen…"
+          emptyText="Kein Artikel gefunden"
+          ariaLabel="Artikel"
+        />
         <input className="input qty" type="number" min={1} value={soll} onChange={(e) => setSoll(Number(e.target.value))} />
         <button className="btn btn-rot slim" disabled={pending || !fach.trim() || !artikelId} onClick={add}><Plus size={15} /> Position</button>
       </div>

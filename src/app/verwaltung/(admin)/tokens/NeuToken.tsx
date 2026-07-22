@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
 import { createToken } from "@/actions/tokens";
+import { Combobox } from "@/components/Combobox";
 
 type Option = { id: string; name: string };
 type ZielMode = "allgemein" | "fahrzeug" | "artikel";
@@ -85,10 +86,14 @@ export function NeuToken({ fahrzeuge, artikel }: { fahrzeuge: Option[]; artikel:
           {mode !== "allgemein" && (
             <div>
               <span className="label">{mode === "fahrzeug" ? "Fahrzeug" : "Artikel"}</span>
-              <select className="input" value={zielId} onChange={(e) => waehleZiel(liste, e.target.value)}>
-                <option value="">{mode === "fahrzeug" ? "Fahrzeug wählen…" : "Artikel wählen…"}</option>
-                {liste.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
+              <Combobox
+                options={liste.map((o) => ({ value: o.id, label: o.name }))}
+                value={zielId}
+                onChange={(v) => waehleZiel(liste, v)}
+                placeholder={mode === "fahrzeug" ? "Fahrzeug wählen…" : "Artikel wählen…"}
+                emptyText={mode === "fahrzeug" ? "Kein Fahrzeug gefunden" : "Kein Artikel gefunden"}
+                ariaLabel={mode === "fahrzeug" ? "Fahrzeug" : "Artikel"}
+              />
               {liste.length === 0 && (
                 <small style={{ color: "var(--stahl)" }}>Noch keine {mode === "fahrzeug" ? "Fahrzeuge" : "Artikel"} angelegt.</small>
               )}

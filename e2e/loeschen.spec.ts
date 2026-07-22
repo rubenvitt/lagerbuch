@@ -20,7 +20,8 @@ test("sicheres Löschen: Tippbestätigung löscht, Historie sperrt und bietet De
       await page.getByRole("button", { name: "Neuer Artikel" }).click();
       const drawer = page.locator(".drawer");
       await drawer.getByPlaceholder("z. B. Beatmungsfilter HME").fill(name);
-      await drawer.locator("div.grid2 input").fill("E2E");
+      // Fach = das schlichte .input in der grid2-Zeile (Einheit ist eine Combobox mit .combo-input).
+      await drawer.locator("div.grid2 input.input").fill("E2E");
       await drawer.getByRole("button", { name: "Artikel anlegen" }).click();
       await expect(drawer).toBeHidden();
       await expect(page.getByRole("cell", { name })).toBeVisible();

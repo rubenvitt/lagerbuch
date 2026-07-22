@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Stepper } from "@/components/Stepper";
 import { createArtikel } from "@/actions/artikel";
+import { Combobox } from "@/components/Combobox";
 
 const EINHEITEN = ["Stk.", "Pkg.", "Fl.", "Box"];
 
@@ -53,11 +54,13 @@ export function NeuArtikel({ onClose }: { onClose: () => void }) {
           <div className="grid2">
             <div>
               <span className="label">Einheit</span>
-              <select className="input" value={einheit} onChange={(e) => setEinheit(e.target.value)}>
-                {EINHEITEN.map((u) => (
-                  <option key={u}>{u}</option>
-                ))}
-              </select>
+              <Combobox
+                options={EINHEITEN.map((u) => ({ value: u, label: u }))}
+                value={einheit}
+                onChange={setEinheit}
+                sort={false}
+                ariaLabel="Einheit"
+              />
             </div>
             <div>
               <span className="label">Fach</span>

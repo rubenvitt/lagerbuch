@@ -10,6 +10,7 @@ import { updateArtikel, setArtikelAktiv } from "@/actions/artikel";
 import { bucheZugang, bucheEntnahme } from "@/actions/buchung";
 import { getDetail, type ArtikelDetailResult } from "@/actions/detail";
 import { chipTone, fmtTs, fmtVerfall, typLabel } from "@/lib/format";
+import { Combobox, type ComboOption } from "@/components/Combobox";
 
 const EINHEITEN = ["Stk.", "Pkg.", "Fl.", "Box"];
 const NEUE_CHARGE = "__neu__";
@@ -232,11 +233,13 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
           </div>
           <div>
             <span className="label">Einheit</span>
-            <select className="input" value={einheit} onChange={(e) => onEinheitChange(e.target.value)}>
-              {EINHEITEN.map((u) => (
-                <option key={u}>{u}</option>
-              ))}
-            </select>
+            <Combobox
+              options={EINHEITEN.map((u) => ({ value: u, label: u }))}
+              value={einheit}
+              onChange={onEinheitChange}
+              sort={false}
+              ariaLabel="Einheit"
+            />
           </div>
         </div>
 
@@ -250,12 +253,20 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
             {detail.fahrzeuge.length > 0 && (
               <div>
                 <span className="label">Ziel</span>
-                <select className="input" value={entnahmeZiel} onChange={(e) => setEntnahmeZiel(e.target.value)}>
-                  <option value="">Handlager (Verbrauch)</option>
-                  {detail.fahrzeuge.map((f) => (
-                    <option key={f.id} value={f.id}>Umlagern → {f.name}</option>
-                  ))}
-                </select>
+                <Combobox
+                  options={[
+                    { value: "", label: "Handlager (Verbrauch)" },
+                    ...[...detail.fahrzeuge]
+                      .sort((a, b) => a.name.localeCompare(b.name, "de"))
+                      .map((f) => ({ value: f.id, label: `Umlagern → ${f.name}`, keywords: f.name })),
+                  ]}
+                  value={entnahmeZiel}
+                  onChange={setEntnahmeZiel}
+                  placeholder="Handlager (Verbrauch)"
+                  emptyText="Kein Ziel gefunden"
+                  ariaLabel="Ziel"
+                  sort={false}
+                />
               </div>
             )}
             <button className="btn btn-rot" disabled={busy || detail.bestand === 0} onClick={onEntnahme}>
@@ -264,14 +275,22 @@ export function ArtikelDrawer({ id, onClose }: { id: string; onClose: () => void
 
             <div style={{ borderTop: "1px solid var(--linie)", paddingTop: 10, display: "grid", gap: 8 }}>
               <span className="label">Zugang · Charge</span>
-              <select className="input" value={chargeAuswahl} onChange={(e) => setChargeAuswahl(e.target.value)}>
-                <option value={NEUE_CHARGE}>+ Neue Charge</option>
-                {detail.chargen.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.chargenNr} · {fmtVerfall(c.verfall)} · Rest {c.rest}
-                  </option>
-                ))}
-              </select>
+              <Combobox
+                options={[
+                  { value: NEUE_CHARGE, label: "+ Neue Charge" },
+                  // Chargen bleiben in FEFO-Reihenfolge (älteste zuerst), daher sort=false.
+                  ...detail.chargen.map((c): ComboOption => ({
+                    value: c.id,
+                    label: `${c.chargenNr} · ${fmtVerfall(c.verfall)} · Rest ${c.rest}`,
+                    keywords: c.chargenNr,
+                  })),
+                ]}
+                value={chargeAuswahl}
+                onChange={setChargeAuswahl}
+                emptyText="Keine Charge gefunden"
+                ariaLabel="Charge"
+                sort={false}
+              />
               {chargeAuswahl === NEUE_CHARGE && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 120 }}>

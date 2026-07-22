@@ -6,6 +6,7 @@ import type { Ampel } from "@/lib/domain/verfall";
 import { chipTone } from "@/lib/format";
 import { Plakette } from "@/components/Plakette";
 import { Filterleiste, type FilterChip } from "@/components/Filterleiste";
+import { Combobox } from "@/components/Combobox";
 import { NeuArtikel } from "./NeuArtikel";
 import { ArtikelDrawer } from "./ArtikelDrawer";
 
@@ -129,23 +130,17 @@ export function ArtikelTable({ rows }: { rows: ArtikelRow[] }) {
         platzhalter="Artikel oder Fach suchen…"
         chips={chips}
         extra={
-          <label className="sortfeld" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <div className="sortfeld" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <span className="label" style={{ margin: 0 }}>Sortierung</span>
-            <select
-              className="input"
-              name="sortierung"
-              style={{ width: "auto" }}
+            <Combobox
+              options={SORT_OPTIONEN.map((o) => ({ value: o.wert, label: o.label }))}
               value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
-              aria-label="Sortierung"
-            >
-              {SORT_OPTIONEN.map((o) => (
-                <option key={o.wert} value={o.wert}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={(v) => setSort(v as SortKey)}
+              sort={false}
+              ariaLabel="Sortierung"
+              style={{ flex: "0 0 200px" }}
+            />
+          </div>
         }
         treffer={{ gezeigt: gefiltert.length, gesamt: rows.length }}
       />

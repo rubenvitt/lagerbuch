@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
 import { flascheSpeichern } from "@/actions/sauerstoff";
+import { Combobox } from "@/components/Combobox";
 
 export function NeuFlasche({ lagerorte }: { lagerorte: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false);
@@ -45,10 +46,14 @@ export function NeuFlasche({ lagerorte }: { lagerorte: { id: string; name: strin
           </div>
           <div>
             <span className="label">Standort</span>
-            <select className="input" value={lagerortId} onChange={(e) => setLagerortId(e.target.value)}>
-              <option value="">Lagerort wählen…</option>
-              {lagerorte.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            <Combobox
+              options={lagerorte.map((l) => ({ value: l.id, label: l.name }))}
+              value={lagerortId}
+              onChange={setLagerortId}
+              placeholder="Lagerort wählen…"
+              emptyText="Kein Lagerort gefunden"
+              ariaLabel="Standort"
+            />
           </div>
           <div className="grid2">
             <div>
