@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import { geraetSpeichern } from "@/actions/bz";
 import type { bzGeraete } from "@/db/schema";
+import { Combobox } from "@/components/Combobox";
 
 type Geraet = typeof bzGeraete.$inferSelect;
 type LagerortOption = { id: string; name: string; typ: "lager" | "fahrzeug" };
@@ -63,11 +64,14 @@ export function ReferenzEditor({ geraet, lagerorte }: { geraet: Geraet; lagerort
         </div>
         <div style={{ flex: 1, minWidth: 140 }}>
           <span className="label">Lagerort</span>
-          <select className="input" value={lagerortId} onChange={(e) => setLagerortId(e.target.value)}>
-            {lagerorte.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
+          <Combobox
+            options={lagerorte.map((l) => ({ value: l.id, label: l.name }))}
+            value={lagerortId}
+            onChange={setLagerortId}
+            placeholder="Lagerort wählen…"
+            emptyText="Kein Lagerort gefunden"
+            ariaLabel="Lagerort"
+          />
         </div>
         <div style={{ flex: 1, minWidth: 120 }}>
           <span className="label">Streifen-Lot</span>

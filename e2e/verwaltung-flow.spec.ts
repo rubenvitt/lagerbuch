@@ -26,9 +26,10 @@ test("verwaltung happy path: create article, zugang, entnahme, journal", async (
     const drawer = page.locator(".drawer");
     await expect(drawer.getByRole("heading", { name: "Neuer Artikel" })).toBeVisible();
     await drawer.getByPlaceholder("z. B. Beatmungsfilter HME").fill(artikelName);
-    // Fach has no <label htmlFor>/aria-label, just a visual span — it's the
-    // only <input> (vs. <select>) inside the Einheit/Fach grid2 row.
-    await drawer.locator("div.grid2 input").fill("E2E");
+    // Fach has no <label htmlFor>/aria-label, just a visual span. Both cells in
+    // the Einheit/Fach grid2 row hold an <input> now (Einheit is a Combobox), so
+    // target the plain .input — the Combobox uses .combo-input.
+    await drawer.locator("div.grid2 input.input").fill("E2E");
     await drawer.getByRole("button", { name: "Artikel anlegen" }).click();
     await expect(drawer).toBeHidden();
     await expect(page.getByRole("cell", { name: artikelName })).toBeVisible();

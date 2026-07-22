@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { Check, HeartPulse, Package } from "lucide-react";
 import { geraetSpeichern } from "@/actions/geraete";
+import { Combobox } from "@/components/Combobox";
 
 export type GeraetInitial = {
   id: string;
@@ -103,9 +104,14 @@ export function GeraetForm({
         </div>
         <div style={{ flex: 1, minWidth: 140 }}>
           <span className="label">Standort</span>
-          <select className="input" value={lagerortId} onChange={(e) => setLagerortId(e.target.value)}>
-            {lagerorte.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
+          <Combobox
+            options={lagerorte.map((l) => ({ value: l.id, label: l.name }))}
+            value={lagerortId}
+            onChange={setLagerortId}
+            placeholder="Standort wählen…"
+            emptyText="Kein Standort gefunden"
+            ariaLabel="Standort"
+          />
         </div>
       </div>
 

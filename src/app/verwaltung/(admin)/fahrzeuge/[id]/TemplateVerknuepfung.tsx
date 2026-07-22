@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { RefreshCw, Link2, Link2Off, Copy } from "lucide-react";
 import { fahrzeugTemplateZuweisen, fahrzeugTemplateSync, fahrzeugTemplateLoesen, templateAusFahrzeug } from "@/actions/templates";
 import type { SyncErgebnis as SyncErgebnisView } from "@/db/template-sync";
+import { Combobox } from "@/components/Combobox";
 
 type TemplateOption = { id: string; name: string };
 
@@ -63,10 +64,15 @@ export function TemplateVerknuepfung({
       )}
       {wechseln && (
         <>
-          <select className="input" value={wahl} onChange={(e) => setWahl(e.target.value)} style={{ width: "auto", flex: "1 1 160px" }}>
-            <option value="">Vorlage wählen…</option>
-            {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <Combobox
+            options={templates.map((t) => ({ value: t.id, label: t.name }))}
+            value={wahl}
+            onChange={setWahl}
+            placeholder="Vorlage wählen…"
+            emptyText="Keine Vorlage gefunden"
+            ariaLabel="Vorlage"
+            style={{ flex: "1 1 160px" }}
+          />
           <button className="btn btn-rot slim" disabled={pending || !wahl} onClick={() => start(async () => { const e = await fahrzeugTemplateZuweisen({ fahrzeugId, templateId: wahl }); setMsg(`Zugewiesen · ${fmtSync(e)}`); setWechseln(false); })}>Zuweisen</button>
           <button className="btn btn-ghost slim" onClick={() => setWechseln(false)}>Abbrechen</button>
         </>
